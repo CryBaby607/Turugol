@@ -81,7 +81,7 @@ const LeagueSelector = ({
                                 const entry = Object.entries(countryData).find(([eng, data]) => data.name === countryName);
                                 const region = entry ? entry[1].region : 'Otros';
                                 const matchesSearch = countryName.toLowerCase().includes(searchApiLeague.toLowerCase()) || 
-                                                     groupedLeagues[countryName].some(l => l.league.name.toLowerCase().includes(searchApiLeague.toLowerCase()));
+                                                    groupedLeagues[countryName].some(l => l.league.name.toLowerCase().includes(searchApiLeague.toLowerCase()));
                                 const matchesRegion = filterRegion === 'All' || region === filterRegion;
                                 return matchesSearch && matchesRegion;
                             }).map(country => (

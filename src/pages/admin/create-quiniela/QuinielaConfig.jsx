@@ -7,8 +7,7 @@ const QuinielaConfig = ({
     maxFixtures, 
     handleInputChange, 
     deadlineError, 
-    MAX_DESCRIPTION_CHARS,
-    onAutoSetDeadline // [MODIFICADO] Prop recibida correctamente
+    MAX_DESCRIPTION_CHARS
 }) => {
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -18,7 +17,6 @@ const QuinielaConfig = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                    {/* Fila del Título */}
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Título del Evento</label> 
                         <input 
@@ -32,21 +30,10 @@ const QuinielaConfig = ({
                         />
                     </div>
 
-                    {/* Fila Mixta: Cierre (Grande) y Partidos (Pequeño) */}
                     <div className="flex gap-4">
-                        {/* Cierre de Apuestas */}
                         <div className="flex-1">
                             <div className="flex justify-between items-center mb-1">
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Cierre de Apuestas</label>
-                                {/* [NUEVO] Botón para ajuste automático basado en el primer partido seleccionado */}
-                                <button
-                                    type="button"
-                                    onClick={onAutoSetDeadline}
-                                    title="Ajustar automáticamente 1 hora antes del primer partido"
-                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors uppercase"
-                                >
-                                    <i className="fas fa-magic"></i> Auto
-                                </button>
                             </div>
                             <input 
                                 name="deadline" 
@@ -56,14 +43,11 @@ const QuinielaConfig = ({
                                 onChange={handleInputChange} 
                                 className={`w-full px-3 py-2 border rounded-lg bg-gray-50 focus:bg-white transition-colors text-sm ${deadlineError ? 'border-red-500' : 'border-gray-300'}`} 
                             />
-                            {deadline && (
-                                <p className="text-[9px] text-gray-400 mt-1 italic">
-                                    * Sugerido: 1 hora antes del primer encuentro.
-                                </p>
-                            )}
+                            <p className="text-[9px] text-gray-400 mt-1 italic">
+                                * Se calcula automáticamente 5 min antes del primer juego.
+                            </p>
                         </div>
 
-                        {/* Selector de Partidos */}
                         <div className="w-24">
                             <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest text-center">Partidos</label> 
                             <div className="relative">
@@ -82,7 +66,6 @@ const QuinielaConfig = ({
                     </div>
                 </div>
 
-                {/* Columna Derecha: Premios */}
                 <div>
                     <div className="flex justify-between items-center mb-1">
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Premios / Reglas</label>

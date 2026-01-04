@@ -1,5 +1,3 @@
-// src/constants/countries.js
-
 export const countryData = {
     // --- AMÉRICA ---
     "Mexico": { name: "México", region: "América" },
@@ -107,9 +105,6 @@ export const countryData = {
     "Africa": { name: "África (Continental)", region: "Mundo" }
 };
 
-/**
- * Diccionario de términos comunes para traducir nombres de ligas
- */
 export const commonTerms = {
     "Cup": "Copa",
     "League": "Liga",
@@ -131,10 +126,6 @@ export const commonTerms = {
     "Youth": "Juvenil"
 };
 
-/**
- * Función para traducir un nombre completo de liga
- * Ejemplo: "Premier League Women" -> "Premier Liga Femenil"
- */
 export const translateLeagueName = (name) => {
     if (!name) return name;
     let translatedName = name;
