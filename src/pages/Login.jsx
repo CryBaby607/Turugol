@@ -1,264 +1,222 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // 1. Importamos useLocation
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore"; // [NUEVO] Importaciones necesarias
 import { auth, db } from "../firebase/config"; 
-
-// [NUEVO] Importación exclusiva de Sonner
-import { toast } from 'sonner';
 
 const Login = () => {
     const navigate = useNavigate();
-    const location = useLocation(); // 2. Inicializamos el hook de ubicación
+    const location = useLocation();
 
     // Estado del Formulario
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    // Estado de UI y Lógica
-    const [rememberMe, setRememberMe] = useState(false);
+    // Estado de UI
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    
-    // Estado de Errores y Mensajes de Firebase 
     const [serverError, setServerError] = useState("");
     const [verificationSent, setVerificationSent] = useState(false);
 
-    // 3. Detectamos si hay una página pendiente (ej: una quiniela compartida)
-    const from = location.state?.from?.pathname || null;
+    // Detectamos si venía de una ruta protegida
+    const from = location.state?.from?.pathname;
 
     const handleFirebaseError = (error) => {
         const map = {
-            "auth/user-not-found": "El correo electrónico no está registrado. Verifica si lo escribiste bien o crea una cuenta nueva.",
-            "auth/wrong-password": "La contraseña es incorrecta. Asegúrate de que las mayúsculas y minúsculas sean correctas.",
-            "auth/invalid-email": "El formato del correo electrónico no es válido (ejemplo: usuario@correo.com).",
-            "auth/too-many-requests": "Demasiados intentos fallidos. Por seguridad, la cuenta se ha bloqueado temporalmente. Intenta de nuevo en unos minutos.",
-            "auth/network-request-failed": "No hay conexión a internet. Revisa tu señal e intenta de nuevo.",
-            "auth/user-disabled": "Esta cuenta ha sido suspendida. Contacta con el administrador.",
-            "auth/invalid-credential": "Los datos de acceso son incorrectos. Por favor, verifica tu correo y contraseña."
+            "auth/user-not-found": "No existe una cuenta con este email.",
+            "auth/wrong-password": "La contraseña es incorrecta.",
+            "auth/invalid-email": "El correo electrónico no es válido.",
+            "auth/too-many-requests": "Demasiados intentos. Intenta más tarde.",
+            "auth/user-disabled": "Esta cuenta ha sido deshabilitada."
         };
-        
-        const message = map[error.code] || "Ocurrió un error inesperado. Por favor, intenta de nuevo.";
-        setServerError(message);
-        
-        // [NUEVO] Manejo de error de servidor con Toast descriptivo
-        toast.error('Error de acceso', {
-            description: message,
-            duration: 5000
-        });
+        return map[error.code] || "Error al iniciar sesión. Verifica tus datos.";
     };
 
-    const isValidEmail = (email) => {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
-    };
-
-    const handleSubmit = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        setServerError(""); 
-        setVerificationSent(false);
-
-        // [MODIFICADO] Validaciones con Toast descriptivo
-        if (!email) return toast.warning('Falta el correo', { description: 'Introduce tu dirección de email para continuar.' });
-        if (!password) return toast.warning('Falta la contraseña', { description: 'Debes ingresar tu clave de acceso.' });
-        if (!isValidEmail(email)) return toast.warning('Correo no válido', { description: 'El formato de email ingresado es incorrecto.' });
-        if (password.length < 6) return toast.warning('Contraseña muy corta', { description: 'Tu contraseña debe tener al menos 6 caracteres.' });
-        
+        setServerError("");
         setIsLoading(true);
-        const toastId = toast.loading('Verificando tus datos...', {
-            description: 'Conectando con el servidor de TURUGOL'
-        });
 
         try {
-            const res = await signInWithEmailAndPassword(auth, email, password);
-            const user = res.user;
+            // 1. Autenticación en Firebase Auth
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
 
-            if (!user.emailVerified) {
-                await sendEmailVerification(user);
-                setVerificationSent(true);
-                setIsLoading(false);
-                const verifyMsg = "Tu correo no está verificado.";
-                setServerError(verifyMsg);
-                
-                // [MODIFICADO] De SweetAlert2 a Sonner descriptivo
-                toast.dismiss(toastId);
-                return toast.info('¡Casi listo!', {
-                    description: 'Tu cuenta no está activa. Enviamos un enlace de verificación. Revisa tu bandeja de entrada o spam.',
-                    duration: 8000
-                });
+            // 2. [SOLUCIÓN] Consultar el Rol en Firestore
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            
+            let role = 'user'; // Rol por defecto
+            if (userDocSnap.exists()) {
+                role = userDocSnap.data().role;
             }
 
-            const userRef = doc(db, "users", user.uid);
-            const snap = await getDoc(userRef);
-
-            if (!snap.exists()) {
-                const noProfileMsg = "No se encontró el perfil de usuario.";
-                setServerError(noProfileMsg);
-                toast.error('Perfil no encontrado', { id: toastId, description: noProfileMsg });
-                setIsLoading(false);
-                return;
-            }
-
-            const role = snap.data().role; 
-            
-            toast.success('¡Acceso concedido!', { 
-                id: toastId,
-                description: 'Bienvenido de nuevo a TURUGOL.'
-            });
-            
-            setTimeout(() => {
-                if (from) {
-                    navigate(from, { replace: true });
+            // 3. Decidir Redirección
+            if (from) {
+                // Si el usuario intentó entrar a una ruta específica, lo devolvemos ahí
+                navigate(from, { replace: true });
+            } else {
+                // Si entra directo al Login, redirigimos según su rol
+                if (role === 'admin') {
+                    navigate('/dashboard/admin', { replace: true });
                 } else {
-                    const redirectPath = role === 'admin' ? '/dashboard/admin' : '/dashboard/user';
-                    navigate(redirectPath, { replace: true }); 
+                    navigate('/dashboard/user', { replace: true });
                 }
-            }, 600);
-            
+            }
+
         } catch (error) {
-            handleFirebaseError(error);
+            console.error("Login error:", error);
+            setServerError(handleFirebaseError(error));
+        } finally {
             setIsLoading(false);
-            toast.dismiss(toastId);
         }
     };
 
-    const handleForgotPassword = () => {
-        navigate('/forgot-password');
+    const handleResendVerification = async () => {
+        if (!auth.currentUser) return;
+        try {
+            await sendEmailVerification(auth.currentUser);
+            setVerificationSent(true);
+        } catch (error) {
+            console.error("Error reenviando verificación:", error);
+        }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 w-full">
-            <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <Link to="/" className="inline-block">
-                        <div className="p-2 rounded-lg font-bold text-4xl">
-                            <span className="text-black">TURU</span>
-                            <span className="text-emerald-500">GOL</span>
-                        </div>
-                    </Link>
-                    <h2 className="mt-6 text-3xl font-bold text-gray-900">
-                        Inicia sesión en tu cuenta
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        O 
-                        <Link 
-                            to="/register" 
-                            state={{ from: location.state?.from }}
-                            className="font-medium text-emerald-600 hover:text-emerald-500 ml-1"
-                        >
-                            crea una cuenta nueva
-                        </Link>
-                    </p>
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="flex justify-center">
+                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform rotate-3">
+                        <i className="fas fa-futbol"></i>
+                    </div>
                 </div>
-                
-                <div className="bg-white py-8 px-4 shadow-lg rounded-2xl sm:px-10 border border-gray-100">
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-                        
-                        {/* [LIMPIEZA] Se eliminaron los bloques de mensajes fijos (divs) */}
+                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Inicia Sesión
+                </h2>
+                <p className="mt-2 text-center text-sm text-gray-600">
+                    Bienvenido de vuelta a <span className="font-bold text-emerald-600">Turugol</span>
+                </p>
+            </div>
 
+            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
+                    
+                    {serverError && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+                            <div className="flex">
+                                <div className="flex-shrink-0">
+                                    <i className="fas fa-exclamation-circle text-red-500"></i>
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                                    {serverError.includes("verificar") && !verificationSent && (
+                                        <button 
+                                            onClick={handleResendVerification}
+                                            className="mt-2 text-xs font-bold text-red-600 hover:text-red-800 underline"
+                                        >
+                                            Reenviar correo de verificación
+                                        </button>
+                                    )}
+                                    {verificationSent && (
+                                        <p className="mt-2 text-xs text-green-600 font-bold">¡Correo enviado!</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <form className="space-y-6" onSubmit={handleLogin}>
+                        {/* Email Input */}
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                                Correo electrónico
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                                Correo Electrónico
                             </label>
-                            <div className="relative">
+                            <div className="mt-1 relative rounded-md shadow-sm">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i className="fas fa-envelope text-gray-400"></i>
                                 </div>
-                                <input 
-                                    id="email" 
-                                    name="email" 
-                                    type="email" 
-                                    autoComplete="email" 
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                                    placeholder="ejemplo@correo.com"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-colors"
+                                    placeholder="tu@correo.com"
                                 />
                             </div>
                         </div>
 
+                        {/* Password Input */}
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Contraseña
                             </label>
-                            <div className="relative">
+                            <div className="mt-1 relative rounded-md shadow-sm">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i className="fas fa-lock text-gray-400"></i>
                                 </div>
-                                <input 
-                                    id="password" 
-                                    name="password" 
-                                    type={showPassword ? "text" : "password"} 
-                                    autoComplete="current-password" 
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                                    className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-colors"
                                     placeholder="••••••••"
                                 />
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
                                 >
-                                    <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"} text-gray-400 hover:text-gray-600`}></i>
+                                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <input 
-                                    id="remember-me" 
-                                    name="remember-me" 
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                                />
-                                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                                    Recordarme
-                                </label>
-                            </div>
-
+                        {/* Forgot Password Row */}
+                        <div className="flex items-center justify-end">
                             <div className="text-sm">
-                                <button 
-                                    type="button"
-                                    onClick={handleForgotPassword}
-                                    className="font-medium text-emerald-600 hover:text-emerald-500"
+                                <Link 
+                                    to="/forgot-password" 
+                                    className="font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
                                 >
                                     ¿Olvidaste tu contraseña?
-                                </button>
+                                </Link>
                             </div>
                         </div>
 
+                        {/* Submit Button */}
                         <div>
-                            <button 
+                            <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-200 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative"
                             >
-                                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                                    {isLoading ? (
+                                {isLoading && (
+                                    <span className="absolute left-4 inset-y-0 flex items-center">
                                         <i className="fas fa-spinner fa-spin"></i>
-                                    ) : (
-                                        <i className="fas fa-sign-in-alt"></i>
-                                    )}
-                                </span>
-                                {isLoading ? 'Procesando...' : 'Iniciar sesión'}
+                                    </span>
+                                )}
+                                {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
                             </button>
                         </div>
                         
+                        {/* Register Link */}
                         <div className="pt-6 border-t border-gray-100">
                             <p className="text-center text-sm text-gray-600">
                                 ¿Nuevo Fichaje? 
                                 <Link 
                                     to="/register" 
                                     state={{ from: location.state?.from }}
-                                    className="font-medium text-emerald-600 hover:text-emerald-500 ml-1"
+                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline"
                                 >
-                                    crea una cuenta nueva
+                                    Crea una cuenta nueva
                                 </Link>
                             </p>
                         </div>

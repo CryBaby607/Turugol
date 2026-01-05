@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
 import { doc, getDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'sonner'; // [MEJORA] Usamos Sonner para alertas más bonitas
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
-import FixtureList from './FixtureList'; // Importar nuevo
-import QuinielaSummary from './QuinielaSummary'; // Importar nuevo
+import FixtureList from './FixtureList';
+import QuinielaSummary from './QuinielaSummary';
 
 const PlayQuiniela = () => {
     const { quinielaId } = useParams();
@@ -17,6 +18,7 @@ const PlayQuiniela = () => {
     const [predictions, setPredictions] = useState({});
     const [alreadyPlayed, setAlreadyPlayed] = useState(false);
     const [showPaymentBanner, setShowPaymentBanner] = useState(false);
+    const [isExpired, setIsExpired] = useState(false); // [NUEVO] Estado de expiración
 
     const BASE_PRICE = 100;
     const MAX_TRIPLES = 3;
@@ -29,22 +31,41 @@ const PlayQuiniela = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!user || !quinielaId) return;
+            if (!quinielaId) return;
             try {
                 const docSnap = await getDoc(doc(db, 'quinielas', quinielaId));
-                if (docSnap.exists()) setQuiniela({ id: docSnap.id, ...docSnap.data() });
+                if (docSnap.exists()) {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    setQuiniela(data);
+
+                    // [NUEVO] Verificación inicial de tiempo
+                    if (data.metadata?.deadline) {
+                        const deadlineDate = new Date(data.metadata.deadline);
+                        if (new Date() > deadlineDate) {
+                            setIsExpired(true);
+                        }
+                    }
+                }
                 
-                const q = query(collection(db, 'userEntries'), where('userId', '==', user.uid), where('quinielaId', '==', quinielaId));
-                const entrySnap = await getDocs(q);
-                if (!entrySnap.empty) setAlreadyPlayed(true);
-            } catch (error) { console.error(error); }
-            finally { setLoading(false); }
+                if (user) {
+                    const q = query(collection(db, 'userEntries'), where('userId', '==', user.uid), where('quinielaId', '==', quinielaId));
+                    const entrySnap = await getDocs(q);
+                    if (!entrySnap.empty) setAlreadyPlayed(true);
+                }
+            } catch (error) { 
+                console.error(error);
+                toast.error("Error al cargar la quiniela");
+            } finally { 
+                setLoading(false); 
+            }
         };
         fetchData();
     }, [quinielaId, user]);
 
     const handleSelect = (fixtureId, selection) => {
-        if (alreadyPlayed || showPaymentBanner) return;
+        // [MEJORA] Bloquear selección si ya expiró
+        if (alreadyPlayed || showPaymentBanner || isExpired) return;
+        
         setPredictions(prev => {
             const currentPicks = prev[fixtureId] || [];
             const newPicks = currentPicks.includes(selection)
@@ -67,20 +88,29 @@ const PlayQuiniela = () => {
     const { doubles, triples, totalCost, combinations } = calculateStats();
 
     const handleSubmit = async () => {
-        if (!user) return alert("Inicia sesión para participar");
+        if (!user) return toast.error("Debes iniciar sesión para participar");
+        
+        // [CRÍTICO] Segunda validación de tiempo justo antes de enviar
+        if (quiniela?.metadata?.deadline) {
+            const deadlineDate = new Date(quiniela.metadata.deadline);
+            if (new Date() > deadlineDate) {
+                setIsExpired(true);
+                return toast.error("¡Lo sentimos! El tiempo para participar ha terminado.");
+            }
+        }
+
         const totalFixtures = quiniela?.fixtures?.length || 0;
         const completeMatches = Object.values(predictions).filter(p => p.length > 0).length;
 
         if (completeMatches < totalFixtures) {
-            return alert("Debes completar todos los partidos.");
+            return toast.warning("Debes completar todos los partidos.");
         }
 
-        // VALIDACIÓN DE LÍMITES AL CONFIRMAR
         if (triples > MAX_TRIPLES) {
-            return alert(`No es posible guardar la quiniela porque se excede el límite permitido de triples. Tienes ${triples} y el máximo es ${MAX_TRIPLES}.`);
+            return toast.warning(`Límite de triples excedido (Máx: ${MAX_TRIPLES})`);
         }
         if (doubles > MAX_DOUBLES) {
-            return alert(`No es posible guardar la quiniela porque se excede el límite permitido de dobles. Tienes ${doubles} y el máximo es ${MAX_DOUBLES}.`);
+            return toast.warning(`Límite de dobles excedido (Máx: ${MAX_DOUBLES})`);
         }
 
         setSubmitting(true);
@@ -96,13 +126,17 @@ const PlayQuiniela = () => {
                 combinations,
                 createdAt: serverTimestamp(),
                 status: 'active',
-                puntos: 0, // [CORREGIDO] de 'points' a 'puntos' para cumplir con las reglas de Firebase
+                puntos: 0, 
                 paymentStatus: 'pending' 
             });
+            
             setShowPaymentBanner(true);
+            toast.success("¡Quiniela guardada con éxito!");
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
         } catch (error) {
-            alert("Error al enviar: " + error.message);
+            console.error(error);
+            toast.error("Error al guardar: " + error.message);
         } finally {
             setSubmitting(false);
         }
@@ -123,21 +157,50 @@ const PlayQuiniela = () => {
                 
                 {/* --- COLUMNA IZQUIERDA --- */}
                 <div className="lg:w-2/3 w-full">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                        <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">{quiniela?.metadata?.title}</h1>
-                        <p className="text-gray-500 text-xs mt-1 font-medium italic text-blue-600 tracking-tight">Haz clic en los botones centrales para elegir tu pronóstico</p>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">{quiniela?.metadata?.title}</h1>
+                            {isExpired ? (
+                                <p className="text-red-600 text-xs mt-1 font-bold bg-red-50 px-2 py-1 rounded inline-block">
+                                    <i className="fas fa-lock mr-1"></i> CERRADA
+                                </p>
+                            ) : (
+                                <p className="text-gray-500 text-xs mt-1 font-medium italic text-blue-600 tracking-tight">
+                                    Haz clic en los botones centrales para elegir tu pronóstico
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     <FixtureList 
                         fixtures={quiniela?.fixtures} 
                         predictions={predictions} 
                         onSelect={handleSelect}
-                        disabled={alreadyPlayed}
+                        disabled={alreadyPlayed || isExpired} // Bloqueo de UI
                     />
                 </div>
 
                 {/* --- COLUMNA DERECHA --- */}
                 <div className="lg:w-1/3 w-full space-y-6">
+                    {/* Alerta de Expiración */}
+                    {isExpired && !showPaymentBanner && (
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm animate-pulse">
+                            <div className="flex">
+                                <div className="flex-shrink-0">
+                                    <i className="fas fa-clock text-red-500"></i>
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-red-700 font-bold">
+                                        Tiempo agotado
+                                    </p>
+                                    <p className="text-xs text-red-600">
+                                        Esta quiniela ya ha cerrado sus inscripciones.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <QuinielaSummary 
                         totalCost={totalCost}
                         doubles={doubles}
@@ -146,10 +209,9 @@ const PlayQuiniela = () => {
                         maxTriples={MAX_TRIPLES}
                         onSubmit={handleSubmit}
                         submitting={submitting}
-                        disabled={alreadyPlayed}
+                        disabled={alreadyPlayed || isExpired} // Bloqueo del botón guardar
                     />
                 </div>
-
             </div>
         </div>
     );

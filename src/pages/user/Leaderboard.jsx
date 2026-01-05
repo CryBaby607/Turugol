@@ -1,94 +1,114 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db, auth } from '../../firebase/config';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import useAuthStatusAndRole from '../../hooks/useAuthStatusAndRole'; // [MEJORA] Hook de rol
 
 const Leaderboard = () => {
-    // Captura flexible para evitar errores de ruta entre admin y usuario
+    // Captura flexible de ID para compatibilidad de rutas
     const params = useParams();
     const quinielaId = (params.quinielaId || params.id)?.trim(); 
     
     const navigate = useNavigate();
+
+    // Hook personalizado para obtener usuario y rol sin lecturas extra a DB
+    const { role, user: currentUser } = useAuthStatusAndRole();
+    const isAdmin = role === 'admin';
+
     const [leaderboard, setLeaderboard] = useState([]);
     const [quinielaInfo, setQuinielaInfo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isAdmin, setIsAdmin] = useState(false); // Estado para verificar si es admin
-    const currentUser = auth.currentUser;
 
+    // 1. Obtener información estática de la Quiniela (Título, status)
     useEffect(() => {
-        const fetchLeaderboardData = async () => {
+        const fetchQuinielaInfo = async () => {
             if (!quinielaId) {
                 setError("ID de quiniela no detectado.");
                 setLoading(false);
                 return;
             }
-
             try {
-                // 1. Verificar si el usuario actual es admin para la visualización del UID
-                if (currentUser) {
-                    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-                    if (userDoc.exists() && userDoc.data().role === 'admin') {
-                        setIsAdmin(true);
-                    }
-                }
-
-                // 2. Obtener información básica de la quiniela
-                const quinielaRef = doc(db, 'quinielas', quinielaId);
-                const quinielaSnap = await getDoc(quinielaRef);
-                
-                if (quinielaSnap.exists()) {
-                    setQuinielaInfo(quinielaSnap.data());
+                const docRef = doc(db, 'quinielas', quinielaId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setQuinielaInfo(docSnap.data());
                 } else {
                     setError("La quiniela no existe o el ID es incorrecto.");
-                    setLoading(false);
-                    return;
                 }
-
-                // 3. Obtener Jugadores ordenados por Puntos
-                const entriesRef = collection(db, 'userEntries');
-                const q = query(
-                    entriesRef,
-                    where('quinielaId', '==', quinielaId),
-                    orderBy('puntos', 'desc')
-                );
-
-                const snapshot = await getDocs(q);
-                const data = snapshot.docs.map((doc, index) => ({
-                    id: doc.id,
-                    rank: index + 1,
-                    ...doc.data()
-                }));
-
-                setLeaderboard(data);
-                setError(null);
-
             } catch (err) {
-                console.error("Error Leaderboard:", err);
-                setError("Error al conectar con la base de datos.");
-            } finally {
-                setLoading(false);
+                console.error("Error info quiniela:", err);
+                setError("Error cargando información.");
             }
         };
+        fetchQuinielaInfo();
+    }, [quinielaId]);
 
-        fetchLeaderboardData();
-    }, [quinielaId, currentUser]);
+    // 2. Suscripción en Tiempo Real al Leaderboard
+    useEffect(() => {
+        if (!quinielaId) return;
+
+        const entriesRef = collection(db, 'userEntries');
+        const q = query(
+            entriesRef,
+            where('quinielaId', '==', quinielaId),
+            orderBy('puntos', 'desc') // Ordenar por puntos de mayor a menor
+        );
+
+        // onSnapshot escucha cambios en vivo (sin recargar página)
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const rawData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // --- LÓGICA DE DESEMPATE (Ranking Justo) ---
+            let currentRank = 1;
+            const processedData = rawData.map((entry, index) => {
+                // Si no es el primero, comparamos con el anterior
+                if (index > 0) {
+                    const prevEntry = rawData[index - 1];
+                    // Si tengo menos puntos que el anterior, mi rango es mi posición real (index + 1)
+                    if (entry.puntos < prevEntry.puntos) {
+                        currentRank = index + 1;
+                    }
+                    // Si tengo los mismos puntos, currentRank no cambia (empate)
+                }
+                
+                return {
+                    ...entry,
+                    rank: currentRank // Asignamos el rango calculado
+                };
+            });
+
+            setLeaderboard(processedData);
+            setLoading(false);
+        }, (err) => {
+            console.error("Error Leaderboard:", err);
+            setError("Error al conectar con la base de datos.");
+            setLoading(false);
+        });
+
+        // Limpieza de la suscripción al salir del componente
+        return () => unsubscribe(); 
+
+    }, [quinielaId]);
 
     const getRankIcon = (rank) => {
-        if (rank === 1) return <i className="fas fa-medal text-yellow-400 text-xl"></i>;
-        if (rank === 2) return <i className="fas fa-medal text-gray-400 text-xl"></i>;
-        if (rank === 3) return <i className="fas fa-medal text-amber-700 text-xl"></i>;
-        return <span className="font-bold text-gray-500">#{rank}</span>;
+        if (rank === 1) return <i className="fas fa-medal text-yellow-400 text-2xl drop-shadow-sm filter"></i>;
+        if (rank === 2) return <i className="fas fa-medal text-gray-400 text-2xl drop-shadow-sm filter"></i>;
+        if (rank === 3) return <i className="fas fa-medal text-amber-700 text-2xl drop-shadow-sm filter"></i>;
+        return <span className="font-bold text-gray-500 text-lg">#{rank}</span>;
     };
 
     if (error) {
         return (
             <div className="max-w-4xl mx-auto p-8 text-center">
-                <div className="bg-red-50 text-red-600 p-6 rounded-2xl border border-red-100">
-                    <i className="fas fa-exclamation-circle text-3xl mb-3"></i>
-                    <h3 className="font-bold text-lg">Error de carga</h3>
-                    <p className="text-sm opacity-80">{error}</p>
-                    <button onClick={() => navigate(-1)} className="mt-4 bg-red-600 text-white px-6 py-2 rounded-xl font-bold text-sm">
+                <div className="bg-red-50 text-red-600 p-6 rounded-2xl border border-red-100 shadow-sm">
+                    <i className="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                    <h3 className="font-bold text-lg">Ocurrió un problema</h3>
+                    <p className="text-sm opacity-80 mb-4">{error}</p>
+                    <button onClick={() => navigate(-1)} className="text-sm font-bold underline hover:text-red-800">
                         Regresar
                     </button>
                 </div>
@@ -98,35 +118,46 @@ const Leaderboard = () => {
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
+            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                <div>
-                    <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 mb-2 flex items-center gap-2 text-sm font-bold">
+                <div className="text-center md:text-left w-full">
+                    <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 mb-2 flex items-center gap-2 text-sm font-bold mx-auto md:mx-0 transition-colors">
                         <i className="fas fa-arrow-left"></i> Volver
                     </button>
-                    <h2 className="text-3xl font-bold text-gray-800">Tabla de Posiciones</h2>
-                    {quinielaInfo && <p className="text-emerald-600 font-medium">{quinielaInfo.metadata.title}</p>}
+                    <div className="flex items-center justify-center md:justify-start gap-3">
+                        <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Posiciones</h2>
+                        {!loading && (
+                            <span className="flex h-3 w-3 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            </span>
+                        )}
+                    </div>
+                    {quinielaInfo && <p className="text-emerald-600 font-bold tracking-wide text-sm mt-1">{quinielaInfo.metadata?.title}</p>}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Tabla */}
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative min-h-[300px]">
                 {loading ? (
-                    <div className="p-12 text-center text-gray-400">
-                        <i className="fas fa-circle-notch fa-spin text-3xl mb-3"></i>
-                        <p>Calculando posiciones...</p>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+                        <i className="fas fa-circle-notch fa-spin text-4xl text-emerald-500 mb-3"></i>
+                        <p className="text-gray-400 font-medium animate-pulse">Sincronizando resultados...</p>
                     </div>
                 ) : leaderboard.length === 0 ? (
-                    <div className="p-12 text-center text-gray-400">
-                        <p>Aún no hay participantes en esta quiniela.</p>
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                        <i className="fas fa-users-slash text-4xl mb-4 opacity-30"></i>
+                        <p>No hay participantes registrados aún.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                                    <th className="p-4 font-bold text-center w-16">Pos</th>
-                                    <th className="p-4 font-bold">Jugador</th>
-                                    <th className="p-4 font-bold text-center">Puntos</th>
-                                    <th className="p-4 font-bold text-center hidden md:table-cell">Estado</th>
+                                <tr className="bg-gray-50 text-[10px] md:text-xs uppercase tracking-widest text-gray-400 border-b border-gray-100">
+                                    <th className="p-4 font-black text-center w-20">Lugar</th>
+                                    <th className="p-4 font-black">Jugador</th>
+                                    <th className="p-4 font-black text-center">Puntos</th>
+                                    <th className="p-4 font-black text-center hidden sm:table-cell">Pago</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
@@ -134,37 +165,51 @@ const Leaderboard = () => {
                                     const isMe = entry.userId === currentUser?.uid;
                                     
                                     return (
-                                        <tr key={entry.id} className={`border-b border-gray-50 last:border-0 transition-colors ${isMe ? 'bg-emerald-50' : 'hover:bg-gray-50'}`}>
+                                        <tr key={entry.id} className={`border-b border-gray-50 last:border-0 transition-colors ${isMe ? 'bg-emerald-50/60' : 'hover:bg-gray-50'}`}>
                                             <td className="p-4 text-center">
                                                 {getRankIcon(entry.rank)}
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${isMe ? 'bg-emerald-500' : 'bg-indigo-400'}`}>
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm ${isMe ? 'bg-emerald-500' : 'bg-gradient-to-br from-indigo-400 to-blue-500'}`}>
                                                         {entry.userName ? entry.userName.charAt(0).toUpperCase() : '?'}
                                                     </div>
-                                                    <div>
-                                                        <p className={`font-bold ${isMe ? 'text-emerald-900' : 'text-gray-700'}`}>
-                                                            {entry.userName} {isMe && '(Tú)'}
-                                                        </p>
-                                                        {/* [NUEVO] Muestra los primeros 6 dígitos del UID solo si es Admin */}
-                                                        {isAdmin && entry.userId && (
-                                                            <p className="text-[10px] text-gray-400 font-mono">
-                                                                ID: {entry.userId.substring(0, 6)}...
-                                                            </p>
+                                                    <div className="flex flex-col">
+                                                        <span className={`font-bold text-sm md:text-base leading-tight ${isMe ? 'text-emerald-900' : 'text-gray-700'}`}>
+                                                            {entry.userName} 
+                                                            {isMe && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-200 text-emerald-800 uppercase tracking-wide">Tú</span>}
+                                                        </span>
+                                                        
+                                                        {/* Información Visible solo para Admin */}
+                                                        {isAdmin && (
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1 rounded border border-gray-200">
+                                                                    ID: {entry.userId?.substring(0, 6)}
+                                                                </span>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="p-4 text-center">
-                                                <span className="inline-block px-3 py-1 bg-gray-100 rounded-lg font-black text-gray-800 text-lg min-w-[3rem]">
+                                                <div className={`inline-flex items-center justify-center w-12 h-10 rounded-xl font-black text-lg shadow-sm ${isMe ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
                                                     {entry.puntos || 0}
-                                                </span>
+                                                </div>
                                             </td>
-                                            <td className="p-4 text-center hidden md:table-cell">
-                                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${entry.status === 'finalized' ? 'text-green-600 bg-green-50' : 'text-blue-600 bg-blue-50'}`}>
-                                                    {entry.status === 'finalized' ? 'Finalizado' : 'En Juego'}
-                                                </span>
+                                            
+                                            {/* Columna Estado de Pago (Oculta en móviles muy pequeños) */}
+                                            <td className="p-4 text-center hidden sm:table-cell">
+                                                {entry.paymentStatus === 'paid' ? (
+                                                     <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-100" title="Pago Verificado">
+                                                        <i className="fas fa-check-circle"></i>
+                                                        <span className="hidden md:inline">OK</span>
+                                                     </div>
+                                                ) : (
+                                                     <div className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded-full text-xs font-bold border border-yellow-100" title="Pago Pendiente">
+                                                        <i className="fas fa-clock"></i>
+                                                        <span className="hidden md:inline">Pend</span>
+                                                     </div>
+                                                )}
                                             </td>
                                         </tr>
                                     );
