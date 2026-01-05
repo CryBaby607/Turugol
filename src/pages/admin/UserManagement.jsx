@@ -1,169 +1,253 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
-import { collection, getDocs, query, where } from 'firebase/firestore'; 
+import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
-    const [selectedUserHistory, setSelectedUserHistory] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const usersPerPage = 10;
 
     useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, 'users'));
+                const querySnapshot = await getDocs(collection(db, "users"));
                 const usersList = querySnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
                 setUsers(usersList);
             } catch (error) {
-                console.error("Error al obtener usuarios:", error);
+                console.error("Error fetching users:", error);
+                toast.error("Error al cargar usuarios");
             } finally {
                 setLoading(false);
             }
         };
+
         fetchUsers();
     }, []);
 
-    const viewHistory = async (userId) => {
-        setLoading(true); 
+    const handleRoleChange = async (userId, newRole) => {
         try {
-            const q = query(collection(db, 'userEntries'), where('userId', '==', userId));
-            const snap = await getDocs(q);
-            const history = snap.docs.map(doc => doc.data());
-            setSelectedUserHistory({ userId, history });
+            await updateDoc(doc(db, "users", userId), {
+                role: newRole
+            });
+            setUsers(users.map(user => 
+                user.id === userId ? { ...user, role: newRole } : user
+            ));
+            toast.success(`Rol actualizado a ${newRole}`);
         } catch (error) {
-            console.error("Error historial:", error);
-        } finally {
-            setLoading(false);
+            console.error("Error updating role:", error);
+            toast.error("Error al actualizar rol");
         }
     };
 
-    const getInitials = (name) => {
-        if (!name) return '??';
-        return name.substring(0, 2).toUpperCase();
+    const handleDeleteUser = async (userId) => {
+        const result = await Swal.fire({
+            title: '¿Estás seguro?',
+            text: "No podrás revertir esto. El usuario perderá acceso.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await deleteDoc(doc(db, "users", userId));
+                setUsers(users.filter(user => user.id !== userId));
+                Swal.fire('Eliminado!', 'El usuario ha sido eliminado.', 'success');
+            } catch (error) {
+                console.error("Error deleting user:", error);
+                toast.error("Error al eliminar usuario");
+            }
+        }
     };
 
-    const getAvatarColor = (name) => {
-        const colors = ['bg-red-100 text-red-600', 'bg-green-100 text-green-600', 'bg-blue-100 text-blue-600', 'bg-yellow-100 text-yellow-600', 'bg-purple-100 text-purple-600'];
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        return colors[Math.abs(hash) % colors.length];
-    };
+    // [MEJORA] Filtrado incluyendo Teléfono
+    const filteredUsers = users.filter(user => {
+        const searchLower = searchTerm.toLowerCase();
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        const phone = (user.phone || '').toLowerCase(); // Nuevo campo de búsqueda
+        
+        return fullName.includes(searchLower) || 
+               email.includes(searchLower) ||
+               phone.includes(searchLower);
+    });
 
-    const filteredUsers = users.filter(u => 
-        u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Lógica de Paginación
+    const indexOfLastUser = currentPage * usersPerPage;
+    const indexOfFirstUser = indexOfLastUser - usersPerPage;
+    const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+    if (loading) return (
+        <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        </div>
     );
 
     return (
-        <div className="max-w-7xl mx-auto p-4 lg:p-8">
-            
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-gray-800">Directorio de Usuarios</h2>
-                    <p className="text-gray-500">Administra el acceso y roles de los usuarios registrados.</p>
-                </div>
-                
-                <div className="relative w-full md:w-96">
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por nombre o correo..." 
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow shadow-sm"
-                        onChange={(e) => setSearchTerm(e.target.value)}
+        <div className="max-w-7xl mx-auto p-4 md:p-8">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <h2 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h2>
+                <div className="relative w-full md:w-64">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                        <i className="fas fa-search"></i>
+                    </span>
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, email o teléfono..."
+                        className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                        value={searchTerm}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setCurrentPage(1);
+                        }}
                     />
-                    <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-100">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuario</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rol</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th> {/* [NUEVO] */}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {loading ? (
-                                <tr><td colSpan="3" className="p-8 text-center text-gray-400">Cargando usuarios...</td></tr>
-                            ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan="3" className="p-8 text-center text-gray-400">No se encontraron usuarios.</td></tr>
-                            ) : (
-                                filteredUsers.map(user => {
-                                    const name = user.displayName || 'Sin Nombre';
-                                    
-                                    return (
-                                        <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${getAvatarColor(name)}`}>
-                                                        {getInitials(name)}
-                                                    </div>
-                                                    <div className="ml-4">
-                                                        <div className="text-sm font-semibold text-gray-900">{name}</div>
-                                                        <div className="text-sm text-gray-500">{user.email}</div>
-                                                    </div>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {currentUsers.map((user) => (
+                                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="flex items-center">
+                                            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+                                                {user.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+                                            </div>
+                                            <div className="ml-4">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                    {user.firstName} {user.lastName}
                                                 </div>
-                                            </td>
-                                            
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-md ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                    {user.role === 'admin' ? 'ADMIN' : 'JUGADOR'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <button 
-                                                    onClick={() => viewHistory(user.id)}
-                                                    className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors font-bold text-xs"
+                                                <div className="text-sm text-gray-500">{user.email}</div>
+                                                {user.username && (
+                                                    <div className="text-xs text-gray-400">@{user.username}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            value={user.role || 'user'}
+                                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                            className={`text-sm rounded-full px-3 py-1 font-semibold border-0 cursor-pointer focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 ${
+                                                user.role === 'admin' 
+                                                ? 'bg-purple-100 text-purple-800' 
+                                                : 'bg-green-100 text-green-800'
+                                            }`}
+                                        >
+                                            <option value="user">Usuario</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </td>
+                                    
+                                    {/* [NUEVO] Columna de Teléfono */}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {user.phone ? (
+                                            <div className="flex items-center text-sm text-gray-600">
+                                                <i className="fas fa-phone mr-2 text-gray-400"></i>
+                                                {user.phone}
+                                                <a 
+                                                    href={`https://wa.me/${user.phone.replace(/\s+/g, '')}`} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="ml-2 text-green-500 hover:text-green-600"
+                                                    title="Enviar WhatsApp"
                                                 >
-                                                    Ver Historial
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
+                                                    <i className="fab fa-whatsapp"></i>
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 italic">Sin registro</span>
+                                        )}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button 
+                                            onClick={() => handleDeleteUser(user.id)}
+                                            className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-full hover:bg-red-50"
+                                            title="Eliminar usuario"
+                                        >
+                                            <i className="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            {selectedUserHistory && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl animate-fade-in">
-                        <h3 className="text-xl font-bold mb-4 text-gray-800">Historial de Juego</h3>
-                        <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                            {selectedUserHistory.history.length > 0 ? (
-                                selectedUserHistory.history.map((h, i) => (
-                                    <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
-                                        <span className="font-bold text-gray-700">{h.quinielaName || 'Quiniela #' + (i+1)}</span>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className={`px-2 py-1 rounded-md text-xs font-bold ${h.status === 'finalized' ? 'bg-green-100 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                                                {h.status === 'finalized' ? `${h.puntos} pts` : 'En Juego'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-8 text-gray-400">
-                                    <i className="fas fa-ghost text-3xl mb-2"></i>
-                                    <p>Este usuario aún no ha participado.</p>
-                                </div>
-                            )}
+                {/* Paginación */}
+                {totalPages > 1 && (
+                    <div className="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
+                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm text-gray-700">
+                                    Mostrando <span className="font-medium">{indexOfFirstUser + 1}</span> a <span className="font-medium">{Math.min(indexOfLastUser, filteredUsers.length)}</span> de <span className="font-medium">{filteredUsers.length}</span> resultados
+                                </p>
+                            </div>
+                            <div>
+                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                    <button
+                                        onClick={() => paginate(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        Anterior
+                                    </button>
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => paginate(i + 1)}
+                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                                currentPage === i + 1
+                                                    ? 'z-10 bg-emerald-50 border-emerald-500 text-emerald-600'
+                                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => paginate(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        Siguiente
+                                    </button>
+                                </nav>
+                            </div>
                         </div>
-                        <button 
-                            onClick={() => setSelectedUserHistory(null)}
-                            className="mt-6 w-full bg-gray-800 text-white py-3 rounded-xl hover:bg-gray-900 font-medium transition-colors"
-                        >
-                            Cerrar
-                        </button>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

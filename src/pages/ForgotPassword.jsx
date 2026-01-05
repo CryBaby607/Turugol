@@ -11,11 +11,12 @@ const ForgotPassword = () => {
 
     const handleFirebaseError = (error) => {
         const map = {
-            "auth/user-not-found": "No existe una cuenta con este email",
-            "auth/invalid-email": "Correo inválido",
-            "auth/network-request-failed": "Error de conexión",
+            "auth/user-not-found": "No existe una cuenta con este email.",
+            "auth/invalid-email": "El formato del correo no es válido.",
+            "auth/network-request-failed": "Error de conexión. Revisa tu internet.",
+            "auth/too-many-requests": "Demasiados intentos. Espera unos minutos."
         };
-        setServerError(map[error.code] || "Error al procesar la solicitud. (" + error.code + ")");
+        setServerError(map[error.code] || "Error al procesar la solicitud. Intenta más tarde.");
     };
 
     const handleSubmit = async (e) => {
@@ -23,14 +24,16 @@ const ForgotPassword = () => {
         setServerError("");
         setMessage("");
 
-        if (!email) return alert('Por favor, introduce tu correo electrónico');
+        if (!email) return;
         
         setIsLoading(true);
 
         try {
             await sendPasswordResetEmail(auth, email);
-            setMessage("Se ha enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada o spam.");
+            setMessage("Hemos enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada o spam.");
+            setEmail(""); // Limpiar campo para evitar múltiples envíos accidentales
         } catch (error) {
+            console.error(error);
             handleFirebaseError(error);
         } finally {
             setIsLoading(false);
@@ -38,44 +41,59 @@ const ForgotPassword = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 w-full">
-            <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <Link to="/" className="inline-block">
-                        <div className="p-2 rounded-lg font-bold text-4xl">
-                            <span className="text-black">TURU</span>
-                            <span className="text-emerald-500">GOL</span>
-                        </div>
-                    </Link>
-                    <h2 className="mt-6 text-3xl font-bold text-gray-900">
-                        Recuperar contraseña
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Introduce tu correo y te enviaremos instrucciones
-                    </p>
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                {/* Logo Unificado */}
+                <div className="flex justify-center">
+                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform rotate-3">
+                        <i className="fas fa-key"></i>
+                    </div>
                 </div>
-                
-                <div className="bg-white py-8 px-4 shadow-lg rounded-2xl sm:px-10 border border-gray-100">
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-                        
-                        {message && (
-                            <div className="p-3 text-sm bg-emerald-100 border border-emerald-400 text-emerald-700 rounded-lg text-center">
-                                {message}
-                            </div>
-                        )}
-                        
-                        {serverError && (
-                            <div className="p-3 text-sm bg-red-100 border border-red-400 text-red-700 rounded-lg">
-                                <p className="font-bold">Error:</p>
-                                {serverError}
-                            </div>
-                        )}
+                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Recuperar Contraseña
+                </h2>
+                <p className="mt-2 text-center text-sm text-gray-600">
+                    No te preocupes, ingresa tu correo y te ayudaremos.
+                </p>
+            </div>
 
+            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
+                    
+                    {/* Mensaje de Éxito */}
+                    {message && (
+                        <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-4 rounded-r animate-fade-in">
+                            <div className="flex">
+                                <div className="flex-shrink-0">
+                                    <i className="fas fa-check-circle text-green-500"></i>
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-green-700 font-medium">{message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Mensaje de Error */}
+                    {serverError && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r animate-pulse">
+                            <div className="flex">
+                                <div className="flex-shrink-0">
+                                    <i className="fas fa-exclamation-circle text-red-500"></i>
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <form className="space-y-6" onSubmit={handleSubmit}>
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                                Correo electrónico
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                                Correo Electrónico
                             </label>
-                            <div className="relative">
+                            <div className="mt-1 relative rounded-md shadow-sm">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i className="fas fa-envelope text-gray-400"></i>
                                 </div>
@@ -85,8 +103,8 @@ const ForgotPassword = () => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 appearance-none block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                                    placeholder="ejemplo@correo.com"
+                                    className="block w-full pl-10 px-3 py-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-shadow"
+                                    placeholder="tu@correo.com"
                                 />
                             </div>
                         </div>
@@ -95,26 +113,27 @@ const ForgotPassword = () => {
                             <button 
                                 type="submit"
                                 disabled={isLoading}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-300 disabled:opacity-50"
+                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-200 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative"
                             >
-                                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                                    {isLoading ? (
+                                {isLoading && (
+                                    <span className="absolute left-4 inset-y-0 flex items-center">
                                         <i className="fas fa-spinner fa-spin"></i>
-                                    ) : (
-                                        <i className="fas fa-paper-plane"></i>
-                                    )}
-                                </span>
-                                {isLoading ? 'Enviando...' : 'Enviar enlace'}
+                                    </span>
+                                )}
+                                {isLoading ? 'Enviando enlace...' : 'Enviar enlace de recuperación'}
                             </button>
                         </div>
                         
                         <div className="pt-6 border-t border-gray-100 text-center">
-                            <Link 
-                                to="/login" 
-                                className="font-medium text-emerald-600 hover:text-emerald-500 text-sm"
-                            >
-                                Volver al inicio de sesión
-                            </Link>
+                            <p className="text-sm text-gray-600">
+                                ¿Ya la recordaste? 
+                                <Link 
+                                    to="/login" 
+                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline"
+                                >
+                                    Volver al inicio de sesión
+                                </Link>
+                            </p>
                         </div>
                     </form>
                 </div>
