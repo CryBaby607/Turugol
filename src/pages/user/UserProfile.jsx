@@ -12,7 +12,7 @@ const UserProfile = () => {
     const [formData, setFormData] = useState({
         displayName: '',
         email: '',
-        phone: '', // [NUEVO] Campo de teléfono
+        phone: '',
         currentPassword: '',
         newPassword: '',
         confirmNewPassword: ''
@@ -22,25 +22,18 @@ const UserProfile = () => {
         const fetchUserData = async () => {
             if (user) {
                 try {
-                    // 1. Cargar datos básicos de Auth
                     let initialData = {
                         displayName: user.displayName || '',
                         email: user.email || '',
                         phone: ''
                     };
 
-                    // 2. Cargar datos extra de Firestore (Teléfono)
                     const userDocRef = doc(db, 'users', user.uid);
                     const userDocSnap = await getDoc(userDocRef);
 
                     if (userDocSnap.exists()) {
                         const firestoreData = userDocSnap.data();
                         initialData.phone = firestoreData.phone || '';
-                        // Priorizamos el nombre de Firestore si existe, si no el de Auth
-                        if (firestoreData.firstName && firestoreData.lastName) {
-                             // Opcional: Si prefieres mostrar Nombre + Apellido
-                             // initialData.displayName = `${firestoreData.firstName} ${firestoreData.lastName}`;
-                        }
                     }
 
                     setFormData(prev => ({ ...prev, ...initialData }));
@@ -66,18 +59,15 @@ const UserProfile = () => {
         try {
             const userDocRef = doc(db, 'users', user.uid);
             
-            // 1. Actualizar Nombre en Auth
             if (formData.displayName !== user.displayName) {
                 await updateProfile(user, { displayName: formData.displayName });
             }
 
-            // 2. Actualizar Teléfono en Firestore
             await updateDoc(userDocRef, {
                 phone: formData.phone,
                 updatedAt: new Date().toISOString()
             });
 
-            // 3. Cambio de Contraseña (Opcional)
             if (formData.newPassword) {
                 if (formData.newPassword !== formData.confirmNewPassword) {
                     throw new Error("Las nuevas contraseñas no coinciden.");
@@ -86,12 +76,10 @@ const UserProfile = () => {
                     throw new Error("Ingresa tu contraseña actual para confirmar el cambio.");
                 }
 
-                // Re-autenticar para operaciones sensibles
                 const credential = EmailAuthProvider.credential(user.email, formData.currentPassword);
                 await reauthenticateWithCredential(user, credential);
                 await updatePassword(user, formData.newPassword);
                 
-                // Limpiar campos de password
                 setFormData(prev => ({
                     ...prev,
                     currentPassword: '',
@@ -102,7 +90,6 @@ const UserProfile = () => {
             }
 
             toast.success("Perfil actualizado correctamente");
-
         } catch (error) {
             console.error(error);
             const errorMsg = error.code === 'auth/wrong-password' 
@@ -135,7 +122,6 @@ const UserProfile = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* --- DATOS PERSONALES --- */}
                     <div className="space-y-4">
                         <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2">
                             Información Personal
@@ -187,7 +173,6 @@ const UserProfile = () => {
                         </div>
                     </div>
 
-                    {/* --- SEGURIDAD --- */}
                     <div className="space-y-4 pt-4">
                         <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2">
                             Seguridad

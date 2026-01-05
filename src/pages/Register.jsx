@@ -15,7 +15,6 @@ const Register = () => {
     const [serverError, setServerError] = useState('');
     const [verificationSent, setVerificationSent] = useState(false);
     
-    // [CAMBIO 1] Agregado el campo 'phone' al estado inicial
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -77,7 +76,6 @@ const Register = () => {
         setIsLoading(true);
 
         try {
-            // 1. Crear usuario en Authentication
             const userCredential = await createUserWithEmailAndPassword(
                 auth, 
                 formData.email, 
@@ -85,25 +83,22 @@ const Register = () => {
             );
             const user = userCredential.user;
 
-            // 2. Actualizar perfil
             const fullName = `${formData.firstName} ${formData.lastName}`.trim();
             await updateProfile(user, {
                 displayName: fullName || formData.username
             });
 
-            // 3. Guardar datos en Firestore
             await setDoc(doc(db, "users", user.uid), {
                 uid: user.uid,
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 username: formData.username,
                 email: formData.email,
-                phone: formData.phone, // [CAMBIO 3] Guardando el teléfono real
+                phone: formData.phone,
                 role: 'user',
                 createdAt: new Date().toISOString(),
             });
 
-            // 4. Enviar verificación
             await sendEmailVerification(user);
             setVerificationSent(true);
 
@@ -172,7 +167,6 @@ const Register = () => {
                     )}
 
                     <form className="space-y-5" onSubmit={handleSubmit}>
-                        
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Nombre</label>
@@ -189,7 +183,6 @@ const Register = () => {
                             <input name="username" type="text" required value={formData.username} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="juanperez99" />
                         </div>
 
-                        {/* [CAMBIO 2] Nuevo Input para Teléfono */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Teléfono (WhatsApp)</label>
                             <div className="mt-1 relative rounded-md shadow-sm">

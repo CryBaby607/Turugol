@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore"; // [NUEVO] Importaciones necesarias
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase/config"; 
 
 const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Estado del Formulario
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    // Estado de UI
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [serverError, setServerError] = useState("");
     const [verificationSent, setVerificationSent] = useState(false);
 
-    // Detectamos si venía de una ruta protegida
     const from = location.state?.from?.pathname;
 
     const handleFirebaseError = (error) => {
@@ -38,25 +35,20 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            // 1. Autenticación en Firebase Auth
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // 2. [SOLUCIÓN] Consultar el Rol en Firestore
             const userDocRef = doc(db, "users", user.uid);
             const userDocSnap = await getDoc(userDocRef);
             
-            let role = 'user'; // Rol por defecto
+            let role = 'user';
             if (userDocSnap.exists()) {
                 role = userDocSnap.data().role;
             }
 
-            // 3. Decidir Redirección
             if (from) {
-                // Si el usuario intentó entrar a una ruta específica, lo devolvemos ahí
                 navigate(from, { replace: true });
             } else {
-                // Si entra directo al Login, redirigimos según su rol
                 if (role === 'admin') {
                     navigate('/dashboard/admin', { replace: true });
                 } else {
@@ -126,7 +118,6 @@ const Login = () => {
                     )}
 
                     <form className="space-y-6" onSubmit={handleLogin}>
-                        {/* Email Input */}
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                                 Correo Electrónico
@@ -149,7 +140,6 @@ const Login = () => {
                             </div>
                         </div>
 
-                        {/* Password Input */}
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Contraseña
@@ -179,7 +169,6 @@ const Login = () => {
                             </div>
                         </div>
 
-                        {/* Forgot Password Row */}
                         <div className="flex items-center justify-end">
                             <div className="text-sm">
                                 <Link 
@@ -191,7 +180,6 @@ const Login = () => {
                             </div>
                         </div>
 
-                        {/* Submit Button */}
                         <div>
                             <button
                                 type="submit"
@@ -207,7 +195,6 @@ const Login = () => {
                             </button>
                         </div>
                         
-                        {/* Register Link */}
                         <div className="pt-6 border-t border-gray-100">
                             <p className="text-center text-sm text-gray-600">
                                 ¿Nuevo Fichaje? 

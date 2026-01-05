@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-// [CORRECCIÓN] Se importa la función de traducción y los datos de países
 import { countryData, translateLeagueName } from '../../../constants/countries'; 
 
 const LeagueSelector = ({ 
@@ -17,7 +16,6 @@ const LeagueSelector = ({
 }) => {
     const [filterRegion, setFilterRegion] = useState('All');
 
-    // Agrupación de ligas por país con traducción aplicada al nombre del país
     const groupedLeagues = apiLeaguesResults.reduce((acc, item) => {
         const countryEnglish = item.country.name;
         const translation = countryData[countryEnglish]?.name || countryEnglish;
@@ -93,7 +91,6 @@ const LeagueSelector = ({
                                                 <div className="flex items-center gap-3 overflow-hidden">
                                                     <img src={item.league.logo} className="h-10 w-10 object-contain group-hover:scale-110 transition-transform" alt="" />
                                                     <div className="flex flex-col">
-                                                        {/* [TRADUCCIÓN APLICADA AQUÍ] */}
                                                         <span className="text-[11px] font-bold text-slate-800 leading-none mb-1">
                                                             {translateLeagueName(item.league.name)}
                                                         </span>
@@ -127,7 +124,6 @@ const LeagueSelector = ({
                                 <div className="bg-white p-3 rounded-2xl shadow-sm mb-3">
                                     <img src={league.logo} alt="" className="h-20 w-20 object-contain drop-shadow-md" />
                                 </div>
-                                {/* [TRADUCCIÓN APLICADA TAMBIÉN EN LA LISTA PRINCIPAL] */}
                                 <span className={`font-black text-xs tracking-tight text-center uppercase leading-tight px-1 ${selectedLeagueId === league.id ? 'text-blue-700' : 'text-gray-500'}`}>
                                     {translateLeagueName(league.name)}
                                 </span>

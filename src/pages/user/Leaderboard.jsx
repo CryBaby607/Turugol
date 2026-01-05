@@ -2,16 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import useAuthStatusAndRole from '../../hooks/useAuthStatusAndRole'; // [MEJORA] Hook de rol
+import useAuthStatusAndRole from '../../hooks/useAuthStatusAndRole';
 
 const Leaderboard = () => {
-    // Captura flexible de ID para compatibilidad de rutas
     const params = useParams();
     const quinielaId = (params.quinielaId || params.id)?.trim(); 
-    
     const navigate = useNavigate();
-
-    // Hook personalizado para obtener usuario y rol sin lecturas extra a DB
     const { role, user: currentUser } = useAuthStatusAndRole();
     const isAdmin = role === 'admin';
 
@@ -20,7 +16,6 @@ const Leaderboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // 1. Obtener información estática de la Quiniela (Título, status)
     useEffect(() => {
         const fetchQuinielaInfo = async () => {
             if (!quinielaId) {
@@ -44,7 +39,6 @@ const Leaderboard = () => {
         fetchQuinielaInfo();
     }, [quinielaId]);
 
-    // 2. Suscripción en Tiempo Real al Leaderboard
     useEffect(() => {
         if (!quinielaId) return;
 
@@ -52,33 +46,24 @@ const Leaderboard = () => {
         const q = query(
             entriesRef,
             where('quinielaId', '==', quinielaId),
-            orderBy('puntos', 'desc') // Ordenar por puntos de mayor a menor
+            orderBy('puntos', 'desc')
         );
 
-        // onSnapshot escucha cambios en vivo (sin recargar página)
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const rawData = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
 
-            // --- LÓGICA DE DESEMPATE (Ranking Justo) ---
             let currentRank = 1;
             const processedData = rawData.map((entry, index) => {
-                // Si no es el primero, comparamos con el anterior
                 if (index > 0) {
                     const prevEntry = rawData[index - 1];
-                    // Si tengo menos puntos que el anterior, mi rango es mi posición real (index + 1)
                     if (entry.puntos < prevEntry.puntos) {
                         currentRank = index + 1;
                     }
-                    // Si tengo los mismos puntos, currentRank no cambia (empate)
                 }
-                
-                return {
-                    ...entry,
-                    rank: currentRank // Asignamos el rango calculado
-                };
+                return { ...entry, rank: currentRank };
             });
 
             setLeaderboard(processedData);
@@ -89,9 +74,7 @@ const Leaderboard = () => {
             setLoading(false);
         });
 
-        // Limpieza de la suscripción al salir del componente
         return () => unsubscribe(); 
-
     }, [quinielaId]);
 
     const getRankIcon = (rank) => {
@@ -118,7 +101,6 @@ const Leaderboard = () => {
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
-            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <div className="text-center md:text-left w-full">
                     <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 mb-2 flex items-center gap-2 text-sm font-bold mx-auto md:mx-0 transition-colors">
@@ -137,7 +119,6 @@ const Leaderboard = () => {
                 </div>
             </div>
 
-            {/* Tabla */}
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative min-h-[300px]">
                 {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10">
@@ -163,12 +144,9 @@ const Leaderboard = () => {
                             <tbody className="text-sm">
                                 {leaderboard.map((entry) => {
                                     const isMe = entry.userId === currentUser?.uid;
-                                    
                                     return (
                                         <tr key={entry.id} className={`border-b border-gray-50 last:border-0 transition-colors ${isMe ? 'bg-emerald-50/60' : 'hover:bg-gray-50'}`}>
-                                            <td className="p-4 text-center">
-                                                {getRankIcon(entry.rank)}
-                                            </td>
+                                            <td className="p-4 text-center">{getRankIcon(entry.rank)}</td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm ${isMe ? 'bg-emerald-500' : 'bg-gradient-to-br from-indigo-400 to-blue-500'}`}>
@@ -179,8 +157,6 @@ const Leaderboard = () => {
                                                             {entry.userName} 
                                                             {isMe && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-200 text-emerald-800 uppercase tracking-wide">Tú</span>}
                                                         </span>
-                                                        
-                                                        {/* Información Visible solo para Admin */}
                                                         {isAdmin && (
                                                             <div className="flex items-center gap-2 mt-0.5">
                                                                 <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1 rounded border border-gray-200">
@@ -196,19 +172,17 @@ const Leaderboard = () => {
                                                     {entry.puntos || 0}
                                                 </div>
                                             </td>
-                                            
-                                            {/* Columna Estado de Pago (Oculta en móviles muy pequeños) */}
                                             <td className="p-4 text-center hidden sm:table-cell">
                                                 {entry.paymentStatus === 'paid' ? (
-                                                     <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-100" title="Pago Verificado">
+                                                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-100" title="Pago Verificado">
                                                         <i className="fas fa-check-circle"></i>
                                                         <span className="hidden md:inline">OK</span>
-                                                     </div>
+                                                    </div>
                                                 ) : (
-                                                     <div className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded-full text-xs font-bold border border-yellow-100" title="Pago Pendiente">
+                                                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded-full text-xs font-bold border border-yellow-100" title="Pago Pendiente">
                                                         <i className="fas fa-clock"></i>
                                                         <span className="hidden md:inline">Pend</span>
-                                                     </div>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>

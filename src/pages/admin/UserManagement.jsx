@@ -8,8 +8,6 @@ const UserManagement = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    
-    // Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const usersPerPage = 10;
 
@@ -72,19 +70,17 @@ const UserManagement = () => {
         }
     };
 
-    // [MEJORA] Filtrado incluyendo Teléfono
     const filteredUsers = users.filter(user => {
         const searchLower = searchTerm.toLowerCase();
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
         const email = (user.email || '').toLowerCase();
-        const phone = (user.phone || '').toLowerCase(); // Nuevo campo de búsqueda
+        const phone = (user.phone || '').toLowerCase();
         
         return fullName.includes(searchLower) || 
                email.includes(searchLower) ||
                phone.includes(searchLower);
     });
 
-    // Lógica de Paginación
     const indexOfLastUser = currentPage * usersPerPage;
     const indexOfFirstUser = indexOfLastUser - usersPerPage;
     const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
@@ -126,7 +122,7 @@ const UserManagement = () => {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th> {/* [NUEVO] */}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
@@ -164,8 +160,6 @@ const UserManagement = () => {
                                             <option value="admin">Admin</option>
                                         </select>
                                     </td>
-                                    
-                                    {/* [NUEVO] Columna de Teléfono */}
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {user.phone ? (
                                             <div className="flex items-center text-sm text-gray-600">
@@ -185,7 +179,6 @@ const UserManagement = () => {
                                             <span className="text-xs text-gray-400 italic">Sin registro</span>
                                         )}
                                     </td>
-
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
                                     </td>
@@ -204,7 +197,6 @@ const UserManagement = () => {
                     </table>
                 </div>
 
-                {/* Paginación */}
                 {totalPages > 1 && (
                     <div className="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
                         <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
@@ -214,7 +206,7 @@ const UserManagement = () => {
                                 </p>
                             </div>
                             <div>
-                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                                     <button
                                         onClick={() => paginate(currentPage - 1)}
                                         disabled={currentPage === 1}

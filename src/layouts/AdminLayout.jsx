@@ -15,13 +15,10 @@ const AdminLayout = () => {
         { path: '/dashboard/admin/create', name: 'Nueva Quiniela', icon: 'fas fa-plus-circle' },
         { path: '/dashboard/admin/quinielas', name: 'Gestionar Quinielas', icon: 'fas fa-trophy' },
         { path: '/dashboard/admin/users', name: 'Usuarios', icon: 'fas fa-users' },
-    
     ];
 
     const handleLogout = async () => {
         try {
-            // MODIFICACIÓN: Forzamos la salida mediante recarga de página a la raíz
-            // Esto evita que ProtectedRoute redirija a /login antes de tiempo
             await signOut(auth);
             window.location.href = "/";
         } catch (error) {
@@ -31,7 +28,6 @@ const AdminLayout = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
-            {/* Overlay para móviles */}
             {isSidebarOpen && (
                 <div 
                     className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
@@ -39,11 +35,8 @@ const AdminLayout = () => {
                 ></div>
             )}
 
-            {/* Sidebar Admin */}
-            <div className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white flex flex-col shadow-2xl transform transition-transform duration-300 ease-in-out
-                lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            `}>
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white flex flex-col shadow-2xl transform transition-transform duration-300 ease-in-out
+                lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="flex items-center justify-between h-16 px-6 bg-gray-800 border-b border-gray-700">
                     <span className="text-xl font-bold tracking-wider">
                         ADMIN<span className="text-emerald-400">PANEL</span>
@@ -87,7 +80,6 @@ const AdminLayout = () => {
                 </div>
             </div>
 
-            {/* Main Content Area */}
             <div className="flex-grow flex flex-col min-w-0 h-full overflow-hidden">
                 <header className="bg-white shadow-sm p-4 border-b border-gray-200 flex justify-between items-center lg:hidden flex-shrink-0 z-30">
                     <span className="font-bold text-gray-700">Panel Admin</span>

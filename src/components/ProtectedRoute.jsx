@@ -6,7 +6,6 @@ const ProtectedRoute = ({ requiredRole }) => {
     const { user, authReady, role, loadingRole } = useAuthStatusAndRole();
     const location = useLocation(); 
 
-    // MODIFICACIÓN: Ahora loadingRole es más estricto, prevenimos redirecciones erróneas
     if (!authReady || loadingRole) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -15,8 +14,6 @@ const ProtectedRoute = ({ requiredRole }) => {
         );
     }
 
-    // Solo verificamos el rol si la carga terminó (loadingRole es false arriba)
-    // Si el rol no coincide (incluyendo si es 'guest' por logout), mandamos al Home directamente
     if (requiredRole && role !== requiredRole) {
         console.warn(`Acceso denegado. Rol requerido: ${requiredRole}, Rol actual: ${role}`);
         return <Navigate to="/" replace />;

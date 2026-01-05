@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
 import { doc, getDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
-import { toast } from 'sonner'; // [MEJORA] Usamos Sonner para alertas más bonitas
+import { toast } from 'sonner';
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 import FixtureList from './FixtureList';
 import QuinielaSummary from './QuinielaSummary';
@@ -18,7 +18,7 @@ const PlayQuiniela = () => {
     const [predictions, setPredictions] = useState({});
     const [alreadyPlayed, setAlreadyPlayed] = useState(false);
     const [showPaymentBanner, setShowPaymentBanner] = useState(false);
-    const [isExpired, setIsExpired] = useState(false); // [NUEVO] Estado de expiración
+    const [isExpired, setIsExpired] = useState(false);
 
     const BASE_PRICE = 100;
     const MAX_TRIPLES = 3;
@@ -38,7 +38,6 @@ const PlayQuiniela = () => {
                     const data = { id: docSnap.id, ...docSnap.data() };
                     setQuiniela(data);
 
-                    // [NUEVO] Verificación inicial de tiempo
                     if (data.metadata?.deadline) {
                         const deadlineDate = new Date(data.metadata.deadline);
                         if (new Date() > deadlineDate) {
@@ -48,7 +47,11 @@ const PlayQuiniela = () => {
                 }
                 
                 if (user) {
-                    const q = query(collection(db, 'userEntries'), where('userId', '==', user.uid), where('quinielaId', '==', quinielaId));
+                    const q = query(
+                        collection(db, 'userEntries'),
+                        where('userId', '==', user.uid),
+                        where('quinielaId', '==', quinielaId)
+                    );
                     const entrySnap = await getDocs(q);
                     if (!entrySnap.empty) setAlreadyPlayed(true);
                 }
@@ -63,7 +66,6 @@ const PlayQuiniela = () => {
     }, [quinielaId, user]);
 
     const handleSelect = (fixtureId, selection) => {
-        // [MEJORA] Bloquear selección si ya expiró
         if (alreadyPlayed || showPaymentBanner || isExpired) return;
         
         setPredictions(prev => {
@@ -90,7 +92,6 @@ const PlayQuiniela = () => {
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
         
-        // [CRÍTICO] Segunda validación de tiempo justo antes de enviar
         if (quiniela?.metadata?.deadline) {
             const deadlineDate = new Date(quiniela.metadata.deadline);
             if (new Date() > deadlineDate) {
@@ -142,7 +143,13 @@ const PlayQuiniela = () => {
         }
     };
 
-    if (loading) return <div className="p-20 text-center font-bold text-emerald-600 animate-pulse text-xl tracking-widest uppercase">Cargando Quiniela...</div>;
+    if (loading) {
+        return (
+            <div className="p-20 text-center font-bold text-emerald-600 animate-pulse text-xl tracking-widest uppercase">
+                Cargando Quiniela...
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-7xl mx-auto p-4 lg:p-6">
@@ -153,13 +160,16 @@ const PlayQuiniela = () => {
                 />
             )}
 
-            <div className={`flex flex-col lg:flex-row gap-8 items-start transition-opacity duration-500 ${showPaymentBanner ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`flex flex-col lg:flex-row gap-8 items-start transition-opacity duration-500 ${
+                showPaymentBanner ? 'opacity-30 pointer-events-none' : 'opacity-100'
+            }`}>
                 
-                {/* --- COLUMNA IZQUIERDA --- */}
                 <div className="lg:w-2/3 w-full">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">{quiniela?.metadata?.title}</h1>
+                            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
+                                {quiniela?.metadata?.title}
+                            </h1>
                             {isExpired ? (
                                 <p className="text-red-600 text-xs mt-1 font-bold bg-red-50 px-2 py-1 rounded inline-block">
                                     <i className="fas fa-lock mr-1"></i> CERRADA
@@ -176,13 +186,11 @@ const PlayQuiniela = () => {
                         fixtures={quiniela?.fixtures} 
                         predictions={predictions} 
                         onSelect={handleSelect}
-                        disabled={alreadyPlayed || isExpired} // Bloqueo de UI
+                        disabled={alreadyPlayed || isExpired}
                     />
                 </div>
 
-                {/* --- COLUMNA DERECHA --- */}
                 <div className="lg:w-1/3 w-full space-y-6">
-                    {/* Alerta de Expiración */}
                     {isExpired && !showPaymentBanner && (
                         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm animate-pulse">
                             <div className="flex">
@@ -209,7 +217,7 @@ const PlayQuiniela = () => {
                         maxTriples={MAX_TRIPLES}
                         onSubmit={handleSubmit}
                         submitting={submitting}
-                        disabled={alreadyPlayed || isExpired} // Bloqueo del botón guardar
+                        disabled={alreadyPlayed || isExpired}
                     />
                 </div>
             </div>

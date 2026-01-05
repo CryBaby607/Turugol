@@ -31,7 +31,7 @@ const ForgotPassword = () => {
         try {
             await sendPasswordResetEmail(auth, email);
             setMessage("Hemos enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada o spam.");
-            setEmail(""); // Limpiar campo para evitar múltiples envíos accidentales
+            setEmail("");
         } catch (error) {
             console.error(error);
             handleFirebaseError(error);
@@ -43,7 +43,6 @@ const ForgotPassword = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                {/* Logo Unificado */}
                 <div className="flex justify-center">
                     <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform rotate-3">
                         <i className="fas fa-key"></i>
@@ -60,7 +59,6 @@ const ForgotPassword = () => {
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
                     
-                    {/* Mensaje de Éxito */}
                     {message && (
                         <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-4 rounded-r animate-fade-in">
                             <div className="flex">
@@ -74,7 +72,6 @@ const ForgotPassword = () => {
                         </div>
                     )}
                     
-                    {/* Mensaje de Error */}
                     {serverError && (
                         <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r animate-pulse">
                             <div className="flex">

@@ -131,7 +131,6 @@ export const translateLeagueName = (name) => {
     let translatedName = name;
     
     Object.entries(commonTerms).forEach(([eng, esp]) => {
-        // Usamos regex para reemplazar palabras completas y evitar errores
         const regex = new RegExp(`\\b${eng}\\b`, 'gi');
         translatedName = translatedName.replace(regex, esp);
     });

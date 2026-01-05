@@ -23,13 +23,8 @@ const PaymentBanner = ({ totalCost, onNavigate, hideButton = false }) => {
                 const currentUser = auth.currentUser;
                 if (currentUser) {
                     const fullName = currentUser.displayName || "Usuario";
-                    // MODIFICACIÓN DEFINITIVA: 6 caracteres del UID
                     const uidShort = currentUser.uid.substring(0, 6).toUpperCase();
-                    
-                    // Solo el primer nombre y limpieza de caracteres extraños para compatibilidad bancaria
                     const firstName = fullName.split(' ')[0].replace(/[^a-zA-Z]/g, '') || "USER";
-                    
-                    // FORMATO FINAL: PRIMER NOMBRE + ESPACIO + 6 CARACTERES UID
                     const generatedConcept = `${firstName} ${uidShort}`.trim().toUpperCase();
                     setPaymentConcept(generatedConcept);
                 }

@@ -10,7 +10,6 @@ const useAuthStatusAndRole = () => {
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
-      // Limpiamos todo al detectar cualquier cambio de auth
       setRole(null);
       setLoadingRole(true);
       
@@ -33,8 +32,6 @@ const useAuthStatusAndRole = () => {
           setLoadingRole(false);
         }
       } else {
-        // Al cerrar sesión, asignamos guest y quitamos el loading de inmediato
-        // para evitar que ProtectedRoute intente redirigir a Login
         setRole('guest');
         setLoadingRole(false);
       }

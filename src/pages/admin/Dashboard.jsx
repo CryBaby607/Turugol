@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import PaymentSettingsForm from './PaymentSettingsForm'; // Importación del nuevo componente
+import PaymentSettingsForm from './PaymentSettingsForm';
 
 const StatCard = ({ title, value, icon, color, subtext, loading }) => {
     const safeColor = color || "text-gray-500 bg-gray-500";
@@ -42,9 +42,9 @@ const AdminDashboardPage = () => {
                 const totalUsers = usersSnap.size;
 
                 const qQuinielas = query(
-                    collection(db, 'quinielas'), 
-                    orderBy('metadata.createdAt', 'desc'), 
-                    limit(10) 
+                    collection(db, 'quinielas'),
+                    orderBy('metadata.createdAt', 'desc'),
+                    limit(10)
                 );
                 const quinielasSnap = await getDocs(qQuinielas);
                 const quinielasData = quinielasSnap.docs.map(doc => ({
@@ -53,15 +53,15 @@ const AdminDashboardPage = () => {
                 }));
 
                 const now = new Date();
-                
-                const active = quinielasData.filter(q => 
+
+                const active = quinielasData.filter(q =>
                     q.metadata?.deadline && new Date(q.metadata.deadline) > now
                 );
-                
+
                 const deadlines = active
                     .map(q => new Date(q.metadata.deadline))
-                    .sort((a,b) => a - b);
-                
+                    .sort((a, b) => a - b);
+
                 const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
 
                 setStats({
@@ -69,9 +69,8 @@ const AdminDashboardPage = () => {
                     activeQuinielas: active.length,
                     nextDeadline
                 });
-                
-                setRecentQuinielas(quinielasData.slice(0, 5));
 
+                setRecentQuinielas(quinielasData.slice(0, 5));
             } catch (error) {
                 console.error("Error cargando dashboard:", error);
             } finally {
@@ -111,7 +110,7 @@ const AdminDashboardPage = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard 
+                <StatCard
                     title="Quinielas Activas"
                     value={stats.activeQuinielas}
                     icon="fas fa-clock"
@@ -119,7 +118,7 @@ const AdminDashboardPage = () => {
                     subtext="Disponibles para jugar"
                     loading={loading}
                 />
-                <StatCard 
+                <StatCard
                     title="Usuarios Registrados"
                     value={stats.totalUsers}
                     icon="fas fa-users"
@@ -127,12 +126,12 @@ const AdminDashboardPage = () => {
                     subtext="Comunidad total"
                     loading={loading}
                 />
-                <StatCard 
+                <StatCard
                     title="Próximo Cierre"
                     value={stats.nextDeadline ? stats.nextDeadline.toLocaleDateString() : 'N/A'}
                     icon="fas fa-calendar-day"
                     color="text-orange-600 bg-orange-600"
-                    subtext={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sin pendientes'}
+                    subtext={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sin pendientes'}
                     loading={loading}
                 />
             </div>
@@ -155,9 +154,13 @@ const AdminDashboardPage = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
-                                    <tr><td colSpan="4" className="p-4 text-center text-gray-400">Cargando datos...</td></tr>
+                                    <tr>
+                                        <td colSpan="4" className="p-4 text-center text-gray-400">Cargando datos...</td>
+                                    </tr>
                                 ) : recentQuinielas.length === 0 ? (
-                                    <tr><td colSpan="4" className="p-4 text-center text-gray-400">No hay quinielas creadas.</td></tr>
+                                    <tr>
+                                        <td colSpan="4" className="p-4 text-center text-gray-400">No hay quinielas creadas.</td>
+                                    </tr>
                                 ) : (
                                     recentQuinielas.map(quiniela => {
                                         const deadline = quiniela.metadata?.deadline ? new Date(quiniela.metadata.deadline) : new Date();
@@ -176,14 +179,14 @@ const AdminDashboardPage = () => {
                                                     {deadline.toLocaleDateString()}
                                                 </td>
                                                 <td className="px-6 py-4 flex justify-center gap-2">
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleShareWhatsApp(quiniela)}
                                                         className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                                         title="Compartir por WhatsApp"
                                                     >
                                                         <i className="fab fa-whatsapp text-lg"></i>
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleCopyLink(quiniela.id)}
                                                         className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
                                                         title="Copiar enlace"
@@ -201,7 +204,6 @@ const AdminDashboardPage = () => {
                 </div>
 
                 <div className="space-y-6">
-                    {/* LLAMADA AL NUEVO COMPONENTE SEPARADO */}
                     <PaymentSettingsForm />
 
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-fit">

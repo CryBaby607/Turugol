@@ -7,7 +7,6 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row justify-between items-center lg:items-start gap-12">
           
-          {/* Columna 1: Logo y descripción */}
           <div className="lg:w-1/2 text-center lg:text-left">
             <Link to="/" className="inline-block mb-6 group">
               <div className="p-2 rounded-lg font-bold text-3xl">
@@ -20,7 +19,6 @@ const Footer = () => {
             </p>
           </div>
 
-          {/* Columna 2: Información de contacto */}
           <div className="lg:w-1/2 w-full text-center lg:text-right flex flex-col items-center lg:items-end">
             <h4 className="text-lg font-bold mb-6 text-white">Contacto</h4>
             <ul className="space-y-4 text-zinc-400">
@@ -31,7 +29,7 @@ const Footer = () => {
                 </div>
               </li>
               <li className="flex items-center lg:justify-end gap-3 group">
-                <span className="text-zinc-500 text-lg">Madrid, España</span>
+                <span className="text-zinc-500 text-lg">Tuxtla Gutierrez, Chiapas</span>
                 <div className="w-10 h-10 rounded-full bg-zinc-900/50 flex items-center justify-center text-zinc-600">
                   <i className="fas fa-map-marker-alt text-sm"></i>
                 </div>

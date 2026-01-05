@@ -12,18 +12,15 @@ const ParticipantsManager = () => {
     const [processingId, setProcessingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- PAGINACIÓN ---
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // 1. Obtener título
                 const qDoc = await getDoc(doc(db, 'quinielas', quinielaId));
                 if (qDoc.exists()) setQuinielaTitle(qDoc.data().metadata.title);
 
-                // 2. Obtener participantes
                 const q = query(
                     collection(db, 'userEntries'), 
                     where('quinielaId', '==', quinielaId)
@@ -35,15 +32,12 @@ const ParticipantsManager = () => {
                     ...doc.data()
                 }));
                 
-                // 3. ORDENAMIENTO: Pendientes primero
                 setEntries(entriesData.sort((a, b) => {
                     const isPaidA = a.paymentStatus === 'paid';
                     const isPaidB = b.paymentStatus === 'paid';
                     
-                    // Prioridad 1: Estado de pago (Pendientes arriba)
                     if (isPaidA !== isPaidB) return isPaidA ? 1 : -1;
                     
-                    // Prioridad 2: Fecha (Más recientes arriba)
                     const dateA = new Date(a.createdAt?.seconds * 1000 || 0);
                     const dateB = new Date(b.createdAt?.seconds * 1000 || 0);
                     return dateB - dateA;
@@ -59,7 +53,6 @@ const ParticipantsManager = () => {
         if (quinielaId) fetchData();
     }, [quinielaId]);
 
-    // Filtrado
     const filteredEntries = entries.filter(entry => {
         const name = (entry.displayName || entry.userName || '').toLowerCase();
         const email = (entry.email || '').toLowerCase();
@@ -68,16 +61,13 @@ const ParticipantsManager = () => {
         return name.includes(search) || email.includes(search) || uid.includes(search);
     });
 
-    // Lógica de Paginación
     const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filteredEntries.slice(indexOfFirstItem, indexOfLastItem);
 
-    // Cambiar página
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-    // Acción: Toggle Pago
     const togglePaymentStatus = async (entryId, currentStatus) => {
         setProcessingId(entryId);
         try {
@@ -109,7 +99,6 @@ const ParticipantsManager = () => {
         }
     };
 
-    // Acción: Eliminar (Solo si NO está pagado)
     const handleDeleteEntry = async (entryId, userName) => {
         if (!window.confirm(`⚠️ ¿Estás seguro de eliminar a ${userName}? \n\nEsta acción borrará su quiniela permanentemente y NO se puede deshacer.`)) return;
 
@@ -117,10 +106,8 @@ const ParticipantsManager = () => {
         try {
             await deleteDoc(doc(db, 'userEntries', entryId));
             
-            // Eliminar de la lista local
             setEntries(prev => prev.filter(e => e.id !== entryId));
             
-            // Si la página actual queda vacía y no es la 1, retroceder
             if (currentItems.length === 1 && currentPage > 1) {
                 setCurrentPage(prev => prev - 1);
             }
@@ -133,7 +120,6 @@ const ParticipantsManager = () => {
         }
     };
 
-    // Utilidades
     const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '??';
     const getAvatarColor = (name) => {
         const colors = ['bg-red-100 text-red-600', 'bg-green-100 text-green-600', 'bg-blue-100 text-blue-600', 'bg-yellow-100 text-yellow-600', 'bg-purple-100 text-purple-600'];
@@ -247,13 +233,11 @@ const ParticipantsManager = () => {
                                                 <button 
                                                     onClick={() => togglePaymentStatus(entry.id, entry.paymentStatus)}
                                                     disabled={processingId === entry.id}
-                                                    className={`
-                                                        relative inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm active:scale-95
+                                                    className={`relative inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm active:scale-95
                                                         ${isPaid 
                                                             ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200' 
                                                             : 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 animate-pulse'}
-                                                        ${processingId === entry.id ? 'opacity-50 cursor-wait' : ''}
-                                                    `}
+                                                        ${processingId === entry.id ? 'opacity-50 cursor-wait' : ''}`}
                                                 >
                                                     {processingId === entry.id ? (
                                                         <i className="fas fa-circle-notch fa-spin mr-2"></i>
@@ -264,9 +248,8 @@ const ParticipantsManager = () => {
                                                 </button>
                                             </td>
                                             
-                                            {/* COLUMNA DE ACCIONES SEGURA */}
                                             <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                {!isPaid && ( // <-- SOLO SE MUESTRA SI NO HA PAGADO
+                                                {!isPaid && ( 
                                                     <button 
                                                         onClick={() => handleDeleteEntry(entry.id, name)}
                                                         className="text-gray-400 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50"
@@ -284,7 +267,6 @@ const ParticipantsManager = () => {
                     </table>
                 </div>
 
-                {/* --- CONTROLES DE PAGINACIÓN --- */}
                 {totalPages > 1 && (
                     <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                         <span className="text-xs text-gray-500">

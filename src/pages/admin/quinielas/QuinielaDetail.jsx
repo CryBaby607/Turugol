@@ -4,14 +4,12 @@ import { db } from '../../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 
 const QuinielaDetail = () => {
-    // [MODIFICADO] Cambiamos id por quinielaId para coincidir con la ruta de App.jsx
     const { quinielaId } = useParams();
     const navigate = useNavigate();
 
     const [quiniela, setQuiniela] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Cargar datos de la quiniela
     useEffect(() => {
         const fetchQuiniela = async () => {
             try {
@@ -98,7 +96,6 @@ const QuinielaDetail = () => {
                     <p className="text-sm text-gray-500 mb-4">{matchesFinished} de {totalMatches} finalizados.</p>
                 </Link>
 
-                {/* [NUEVA TARJETA] */}
                 <Link 
                     to={`/dashboard/admin/quinielas/${quinielaId}/leaderboard`}
                     className="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-emerald-200 transition-all flex flex-col items-center text-center cursor-pointer relative overflow-hidden"
