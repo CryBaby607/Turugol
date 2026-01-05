@@ -1,29 +1,27 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
     createUserWithEmailAndPassword, 
-    updateProfile,
+    updateProfile, 
     sendEmailVerification 
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from "../firebase/config";
 
-// [NUEVO] Importación exclusiva de Sonner
-import { toast } from 'sonner';
-
 const Register = () => {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [serverError, setServerError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
     const [verificationSent, setVerificationSent] = useState(false);
     
+    // [CAMBIO 1] Agregado el campo 'phone' al estado inicial
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
-        email: '',
-        phone: '', 
         username: '',
+        phone: '', 
+        email: '',
         password: '',
         confirmPassword: '',
     });
@@ -31,262 +29,271 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    const [passwordStrength, setPasswordStrength] = useState({
-        score: 0,
-        text: 'Débil',
-        color: 'bg-red-500',
-        width: '25%'
-    });
-    const [passwordChecks, setPasswordChecks] = useState({
-        length: false,
-        number: false,
-        capital: false,
-    });
     const [passwordMatch, setPasswordMatch] = useState({
         isMatch: false,
         message: '',
         color: ''
     });
 
-    // [NUEVO] Configuración de límites
-    const MAX_NAME_LENGTH = 25;
-
-    // [NUEVO] Función para limpiar nombres (solo letras y espacios)
-    const sanitizeName = (value) => {
-        return value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
-    };
-
-    // [NUEVO] Función para limpiar teléfono (solo números)
-    const sanitizePhone = (value) => {
-        return value.replace(/\D/g, '');
-    };
-
-    const checkPasswordStrength = (password) => {
-        let score = 0;
-        const checks = {
-            length: password.length >= 8,
-            number: /\d/.test(password),
-            capital: /[A-Z]/.test(password),
-            special: /[^a-zA-Z0-9]/.test(password),
-        };
-        
-        if (checks.length) score += 1;
-        if (checks.number) score += 1;
-        if (checks.capital) score += 1;
-        if (checks.special) score += 1;
-
-        setPasswordChecks({
-            length: checks.length,
-            number: checks.number,
-            capital: checks.capital,
-        });
-
-        let strength = { score, text: 'Débil', color: 'bg-red-500', width: '25%' };
-        if (score === 2) strength = { ...strength, text: 'Regular', color: 'bg-yellow-500', width: '50%' };
-        else if (score === 3) strength = { ...strength, text: 'Buena', color: 'bg-blue-500', width: '75%' };
-        else if (score >= 4) strength = { ...strength, text: 'Fuerte', color: 'bg-emerald-500', width: '100%' };
-
-        setPasswordStrength(strength);
-    };
-
-    const checkPasswordMatch = (password, confirmPassword) => {
-        if (!password || !confirmPassword) {
-            setPasswordMatch({ isMatch: false, message: '', color: '' });
-            return;
-        }
-        if (password === confirmPassword && password.length > 0) {
-            setPasswordMatch({ isMatch: true, message: '✓ Las contraseñas coinciden', color: 'text-green-600' });
-        } else if (confirmPassword.length > 0) {
-            setPasswordMatch({ isMatch: false, message: '✗ Las contraseñas no coinciden', color: 'text-red-600' });
-        }
-    };
-
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        
-        let finalValue = value;
-        
-        // [MODIFICADO] Blindaje con límites de caracteres
-        if (name === 'firstName' || name === 'lastName') {
-            finalValue = sanitizeName(value).substring(0, MAX_NAME_LENGTH);
-        } else if (name === 'phone') {
-            finalValue = sanitizePhone(value).substring(0, 10);
-        }
+        setFormData(prev => ({ ...prev, [name]: value }));
 
-        setFormData(prev => ({ ...prev, [name]: finalValue }));
+        if (name === 'password' || name === 'confirmPassword') {
+            const valPass = name === 'password' ? value : formData.password;
+            const valConfirm = name === 'confirmPassword' ? value : formData.confirmPassword;
 
-        if (name === 'password') {
-            checkPasswordStrength(value);
-            checkPasswordMatch(value, formData.confirmPassword);
+            if (valPass && valConfirm) {
+                if (valPass === valConfirm) {
+                    setPasswordMatch({ isMatch: true, message: 'Las contraseñas coinciden', color: 'text-green-600' });
+                } else {
+                    setPasswordMatch({ isMatch: false, message: 'Las contraseñas no coinciden', color: 'text-red-500' });
+                }
+            } else {
+                setPasswordMatch({ isMatch: false, message: '', color: '' });
+            }
         }
-        if (name === 'confirmPassword') {
-            checkPasswordMatch(formData.password, value);
-        }
+    };
+
+    const handleFirebaseError = (error) => {
+        const map = {
+            "auth/email-already-in-use": "Este correo ya está registrado.",
+            "auth/invalid-email": "El correo no es válido.",
+            "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+            "auth/operation-not-allowed": "El registro no está habilitado."
+        };
+        return map[error.code] || "Error al crear la cuenta. Intenta de nuevo.";
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
 
-        if (formData.phone.length < 10) {
-            toast.error('Teléfono inválido', { description: 'El número debe tener 10 dígitos.' });
+        if (formData.password !== formData.confirmPassword) {
+            setServerError("Las contraseñas no coinciden.");
             return;
         }
-        
-        if (passwordStrength.score < 3) {
-            toast.error('Contraseña débil', { description: 'Asegúrate de cumplir con los requisitos de seguridad.' });
-            return setServerError('Contraseña demasiado débil.');
-        }
-        if (!passwordMatch.isMatch) {
-            toast.error('Error de coincidencia', { description: 'Las contraseñas ingresadas no son iguales.' });
-            return setServerError('Las contraseñas no coinciden.');
-        }
-        
+
         setIsLoading(true);
-        const toastId = toast.loading('Creando tu cuenta...');
 
         try {
-            const res = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-            await updateProfile(res.user, { displayName: `${formData.firstName.trim()} ${formData.lastName.trim()}` });
-            
-            await setDoc(doc(db, 'users', res.user.uid), {
-                uid: res.user.uid,
-                name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-                username: formData.username.trim(),
-                email: res.user.email,
-                phone: formData.phone,
-                role: "user",
-                createdAt: new Date().toISOString()
-            });
-            
-            await sendEmailVerification(res.user, { url: window.location.origin + '/login' });
-            
-            setVerificationSent(true);
-            setSuccessMessage('Cuenta creada. Verifica tu email.');
-            
-            toast.success('¡Registro exitoso!', {
-                id: toastId,
-                description: 'Revisa tu bandeja de entrada o carpeta de SPAM para activar tu cuenta. Redirigiendo...',
-                duration: 6000
+            // 1. Crear usuario en Authentication
+            const userCredential = await createUserWithEmailAndPassword(
+                auth, 
+                formData.email, 
+                formData.password
+            );
+            const user = userCredential.user;
+
+            // 2. Actualizar perfil
+            const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+            await updateProfile(user, {
+                displayName: fullName || formData.username
             });
 
-            setTimeout(() => {
-                navigate('/login');
-            }, 5000);
+            // 3. Guardar datos en Firestore
+            await setDoc(doc(db, "users", user.uid), {
+                uid: user.uid,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                username: formData.username,
+                email: formData.email,
+                phone: formData.phone, // [CAMBIO 3] Guardando el teléfono real
+                role: 'user',
+                createdAt: new Date().toISOString(),
+            });
+
+            // 4. Enviar verificación
+            await sendEmailVerification(user);
+            setVerificationSent(true);
 
         } catch (error) {
-            const map = {
-                'auth/email-already-in-use': 'Este correo ya está registrado en TURUGOL.',
-                'auth/invalid-email': 'El formato del correo no es válido.',
-                'auth/weak-password': 'La contraseña es muy insegura.'
-            };
-            const message = map[error.code] || 'Ocurrió un error al registrar. Intenta de nuevo.';
-            setServerError(message);
-            toast.error('No se pudo completar el registro', { id: toastId, description: message });
+            console.error("Registration error:", error);
+            setServerError(handleFirebaseError(error));
         } finally {
             setIsLoading(false);
         }
     };
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12 w-full">
-            <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <Link to="/" className="inline-block">
-                        <div className="p-2 rounded-lg font-bold text-4xl">
-                            <span className="text-black">TURU</span>
-                            <span className="text-emerald-500">GOL</span>
+    if (verificationSent) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+                <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                    <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 text-center">
+                        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                            <i className="fas fa-check text-green-600"></i>
                         </div>
-                    </Link>
-                    <h2 className="mt-6 text-3xl font-bold text-gray-900">Crea tu cuenta</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        O <Link to="/login" className="font-medium text-emerald-600 hover:text-emerald-500 ml-1">inicia sesión</Link>
-                    </p>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900">¡Cuenta creada!</h3>
+                        <p className="mt-2 text-sm text-gray-500">
+                            Hemos enviado un enlace de verificación a <b>{formData.email}</b>.
+                            Por favor revisa tu bandeja de entrada para activar tu cuenta.
+                        </p>
+                        <div className="mt-6">
+                            <Link to="/login" className="text-emerald-600 font-bold hover:text-emerald-500">
+                                Ir al Inicio de Sesión
+                            </Link>
+                        </div>
+                    </div>
                 </div>
-                
-                <div className="bg-white py-8 px-4 shadow-lg rounded-2xl sm:px-10 border border-gray-100">
-                    <form className="space-y-6" onSubmit={handleSubmit}>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="flex justify-center">
+                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform -rotate-3">
+                        <i className="fas fa-user-plus"></i>
+                    </div>
+                </div>
+                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Crea tu cuenta
+                </h2>
+                <p className="mt-2 text-center text-sm text-gray-600">
+                    Únete a la comunidad de <span className="font-bold text-emerald-600">Turugol</span>
+                </p>
+            </div>
+
+            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
+                    
+                    {serverError && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+                            <div className="flex">
+                                <div className="flex-shrink-0">
+                                    <i className="fas fa-exclamation-circle text-red-500"></i>
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <form className="space-y-5" onSubmit={handleSubmit}>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-user text-gray-400"></i></div>
-                                    <input name="firstName" type="text" required maxLength={MAX_NAME_LENGTH} value={formData.firstName} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="Juan" />
-                                </div>
+                                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                                <input name="firstName" type="text" required value={formData.firstName} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="Juan" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-user text-gray-400"></i></div>
-                                    <input name="lastName" type="text" required maxLength={MAX_NAME_LENGTH} value={formData.lastName} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="Pérez" />
+                                <label className="block text-sm font-medium text-gray-700">Apellido</label>
+                                <input name="lastName" type="text" required value={formData.lastName} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="Pérez" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nombre de Usuario (Alias)</label>
+                            <input name="username" type="text" required value={formData.username} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="juanperez99" />
+                        </div>
+
+                        {/* [CAMBIO 2] Nuevo Input para Teléfono */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Teléfono (WhatsApp)</label>
+                            <div className="mt-1 relative rounded-md shadow-sm">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i className="fas fa-phone text-gray-400"></i>
                                 </div>
+                                <input 
+                                    name="phone" 
+                                    type="tel" 
+                                    required 
+                                    value={formData.phone} 
+                                    onChange={handleInputChange} 
+                                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
+                                    placeholder="55 1234 5678" 
+                                />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono (WhatsApp)</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-phone text-gray-400"></i></div>
-                                <input name="phone" type="text" required maxLength="10" value={formData.phone} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="9611234567" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-envelope text-gray-400"></i></div>
-                                <input name="email" type="email" required value={formData.email} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="ejemplo@correo.com" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-at text-gray-400"></i></div>
-                                <input name="username" type="text" required value={formData.username} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="juanperez" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-lock text-gray-400"></i></div>
-                                <input name="password" type={showPassword ? "text" : "password"} required value={formData.password} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="••••••••" />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center"><i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"} text-gray-400`}></i></button>
-                            </div>
-                            
-                            <div className="mt-2">
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-xs text-gray-500">Fortaleza</span>
-                                    <span className={`text-xs font-medium ${passwordStrength.color.replace('bg-', 'text-')}`}>{passwordStrength.text}</span>
+                            <label className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
+                            <div className="mt-1 relative rounded-md shadow-sm">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i className="fas fa-envelope text-gray-400"></i>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div className={`${passwordStrength.color} h-1.5 rounded-full transition-all duration-300`} style={{ width: passwordStrength.width }}></div>
-                                </div>
-                                <div className="mt-2 text-xs text-gray-500">
-                                    <ul className="list-disc list-inside ml-2">
-                                        <li className={passwordChecks.length ? "text-emerald-600" : "text-red-500"}>8 caracteres</li>
-                                        <li className={passwordChecks.capital ? "text-emerald-600" : "text-red-500"}>1 mayúscula</li>
-                                        <li className={passwordChecks.number ? "text-emerald-600" : "text-red-500"}>1 número</li>
-                                    </ul>
-                                </div>
+                                <input name="email" type="email" autoComplete="email" required value={formData.email} onChange={handleInputChange} className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="tu@correo.com" />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-lock text-gray-400"></i></div>
-                                <input name="confirmPassword" type={showPassword ? "text" : "password"} required value={formData.confirmPassword} onChange={handleInputChange} className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-lg sm:text-sm" placeholder="••••••••" />
+                            <label className="block text-sm font-medium text-gray-700">Contraseña</label>
+                            <div className="mt-1 relative rounded-md shadow-sm">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i className="fas fa-lock text-gray-400"></i>
+                                </div>
+                                <input 
+                                    name="password" 
+                                    type={showPassword ? "text" : "password"} 
+                                    required 
+                                    value={formData.password} 
+                                    onChange={handleInputChange} 
+                                    className="block w-full pl-10 pr-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
+                                    placeholder="Mínimo 6 caracteres" 
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                                >
+                                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                </button>
                             </div>
-                            {passwordMatch.message && <div className={`mt-1 text-xs ${passwordMatch.color}`}>{passwordMatch.message}</div>}
                         </div>
 
-                        <button type="submit" disabled={isLoading} className="w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all">
-                            {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-user-plus mr-2"></i>}
-                            {isLoading ? 'Creando...' : 'Crear cuenta'}
-                        </button>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Confirmar contraseña</label>
+                            <div className="mt-1 relative rounded-md shadow-sm">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i className="fas fa-lock text-gray-400"></i>
+                                </div>
+                                <input 
+                                    name="confirmPassword" 
+                                    type={showPassword ? "text" : "password"} 
+                                    required 
+                                    value={formData.confirmPassword} 
+                                    onChange={handleInputChange} 
+                                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
+                                    placeholder="Repite tu contraseña" 
+                                />
+                            </div>
+                            {passwordMatch.message && (
+                                <p className={`mt-1 text-xs ${passwordMatch.color}`}>
+                                    {passwordMatch.message}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="pt-2">
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-200 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin mr-2"></i> Creando cuenta...
+                                    </>
+                                ) : (
+                                    'Registrarse'
+                                )}
+                            </button>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-gray-100">
+                            <p className="text-center text-sm text-gray-600">
+                                ¿Ya tienes cuenta? 
+                                <Link 
+                                    to="/login" 
+                                    state={{ from: location.state?.from }}
+                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline"
+                                >
+                                    Inicia sesión aquí
+                                </Link>
+                            </p>
+                        </div>
                     </form>
                 </div>
             </div>
