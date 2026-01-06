@@ -20,7 +20,7 @@ const PlayQuiniela = () => {
     const [showPaymentBanner, setShowPaymentBanner] = useState(false);
     const [isExpired, setIsExpired] = useState(false);
 
-    const BASE_PRICE = 100;
+    // Límites de combinaciones (Reglas de Negocio)
     const MAX_TRIPLES = 3;
     const MAX_DOUBLES = 4;
 
@@ -70,6 +70,7 @@ const PlayQuiniela = () => {
         
         setPredictions(prev => {
             const currentPicks = prev[fixtureId] || [];
+            // Si ya está seleccionado, lo quita (toggle). Si no, lo agrega.
             const newPicks = currentPicks.includes(selection)
                 ? currentPicks.filter(item => item !== selection)
                 : [...currentPicks, selection];
@@ -78,16 +79,31 @@ const PlayQuiniela = () => {
         });
     };
 
+    // --- CORRECCIÓN DE LÓGICA DE CÁLCULO ---
     const calculateStats = () => {
-        let doubles = 0, triples = 0, combinations = 1;
+        let doubles = 0;
+        let triples = 0;
+
+        // Contar dobles y triples según las selecciones del usuario
         Object.values(predictions).forEach(p => {
-            if (p.length === 2) { doubles++; combinations *= 2; }
-            if (p.length === 3) { triples++; combinations *= 3; }
+            if (p.length === 2) doubles++;
+            if (p.length === 3) triples++;
         });
-        return { doubles, triples, totalCost: BASE_PRICE * combinations, combinations };
+
+        // Fórmula matemática para combinaciones: 2^D * 3^T
+        const combinations = (2 ** doubles) * (3 ** triples);
+
+        // Obtenemos el PRECIO BASE configurado por el Admin (default 100 si no existe)
+        // Nota: Ahora 'cost' se interpreta como "Costo por Quiniela Sencilla"
+        const basePrice = quiniela?.metadata?.cost !== undefined ? Number(quiniela.metadata.cost) : 100;
+
+        // Costo Total = Combinaciones * Precio Base
+        const totalCost = combinations * basePrice;
+
+        return { doubles, triples, totalCost, combinations, basePrice };
     };
 
-    const { doubles, triples, totalCost, combinations } = calculateStats();
+    const { doubles, triples, totalCost, combinations, basePrice } = calculateStats();
 
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
@@ -103,6 +119,7 @@ const PlayQuiniela = () => {
         const totalFixtures = quiniela?.fixtures?.length || 0;
         const completeMatches = Object.values(predictions).filter(p => p.length > 0).length;
 
+        // Validación: Deben estar todos los partidos pronosticados (al menos 1 opción)
         if (completeMatches < totalFixtures) {
             return toast.warning("Debes completar todos los partidos.");
         }
@@ -123,8 +140,9 @@ const PlayQuiniela = () => {
                 quinielaId,
                 quinielaName: quiniela.metadata.title,
                 predictions,
-                totalCost,
-                combinations,
+                totalCost,      // Guardamos el costo calculado final
+                combinations,   // Guardamos el número de combinaciones jugadas
+                basePrice,      // (Opcional) Guardar el precio base histórico
                 createdAt: serverTimestamp(),
                 status: 'active',
                 puntos: 0, 
@@ -165,7 +183,7 @@ const PlayQuiniela = () => {
             }`}>
                 
                 <div className="lg:w-2/3 w-full">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 flex justify-between items-center">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
                             <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
                                 {quiniela?.metadata?.title}
@@ -175,9 +193,11 @@ const PlayQuiniela = () => {
                                     <i className="fas fa-lock mr-1"></i> CERRADA
                                 </p>
                             ) : (
-                                <p className="text-gray-500 text-xs mt-1 font-medium italic text-blue-600 tracking-tight">
-                                    Haz clic en los botones centrales para elegir tu pronóstico
-                                </p>
+                                <div className="mt-1 text-sm text-gray-500">
+                                    <span className="font-bold text-emerald-600">Precio por quiniela: ${basePrice} MXN</span>
+                                    <span className="mx-2">•</span>
+                                    <span className="italic">Selecciona dobles/triples para aumentar tus chances</span>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -198,17 +218,14 @@ const PlayQuiniela = () => {
                                     <i className="fas fa-clock text-red-500"></i>
                                 </div>
                                 <div className="ml-3">
-                                    <p className="text-sm text-red-700 font-bold">
-                                        Tiempo agotado
-                                    </p>
-                                    <p className="text-xs text-red-600">
-                                        Esta quiniela ya ha cerrado sus inscripciones.
-                                    </p>
+                                    <p className="text-sm text-red-700 font-bold">Tiempo agotado</p>
+                                    <p className="text-xs text-red-600">Esta quiniela ya ha cerrado sus inscripciones.</p>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* El resumen recibirá el costo total ya multiplicado */}
                     <QuinielaSummary 
                         totalCost={totalCost}
                         doubles={doubles}
@@ -218,6 +235,8 @@ const PlayQuiniela = () => {
                         onSubmit={handleSubmit}
                         submitting={submitting}
                         disabled={alreadyPlayed || isExpired}
+                        // Pasamos combinations por si QuinielaSummary quiere mostrarlo (ej: "8 quinielas")
+                        combinations={combinations}
                     />
                 </div>
             </div>

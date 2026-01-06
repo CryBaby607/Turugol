@@ -35,17 +35,22 @@ const CreateQuiniela = () => {
     const user = auth.currentUser; 
     const currentAdminId = user ? user.uid : null; 
 
+    // --- ESTADOS DE LIGAS ---
     const [leagues, setLeagues] = useState(INITIAL_LEAGUES);
     const [isManagingLeagues, setIsManagingLeagues] = useState(false);
     const [apiLeaguesResults, setApiLeaguesResults] = useState([]);
     const [isSearchingLeagues, setIsSearchingLeagues] = useState(false);
     const [searchApiLeague, setSearchApiLeague] = useState('');
 
+    // --- ESTADOS DE CONFIGURACIÓN ---
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState(''); 
     const [maxFixtures, setMaxFixtures] = useState(10);
+    // NUEVO: Costo de la quiniela (Default $100 MXN)
+    const [cost, setCost] = useState(100);
     
+    // --- ESTADOS DE SELECCIÓN DE PARTIDOS ---
     const [selectedLeagueId, setSelectedLeagueId] = useState(null); 
     const [selectedRound, setSelectedRound] = useState(''); 
     
@@ -56,6 +61,7 @@ const CreateQuiniela = () => {
     const [searchTerm, setSearchTerm] = useState(''); 
     const [selectedFixtures, setSelectedFixtures] = useState([]); 
     
+    // --- ESTADOS DE INTERFAZ Y CARGA ---
     const [isLoading, setIsLoading] = useState(false);
     const [apiError, setApiError] = useState(null);
     const [isSaving, setIsSaving] = useState(false); 
@@ -66,6 +72,7 @@ const CreateQuiniela = () => {
 
     const getBorradorRef = (uid) => doc(db, QUINIELA_BORRADORES_COLLECTION, uid);
 
+    // --- LÓGICA DE BORRADOR (AUTOGUARDADO) ---
     const persistDraft = async (overrides = {}, silent = false) => {
         if (!currentAdminId || initialLoadRef.current || isSubmittingRef.current) return;
 
@@ -73,6 +80,7 @@ const CreateQuiniela = () => {
             title, 
             description, 
             deadline, 
+            cost, // Guardamos el costo
             selectedFixtures, 
             selectedLeagueId, 
             selectedRound,
@@ -94,11 +102,13 @@ const CreateQuiniela = () => {
         }
     };
 
+    // --- AJUSTE AUTOMÁTICO DE FECHA LÍMITE ---
     const autoSetDeadline = useCallback((silent = false) => {
         if (selectedFixtures.length === 0) return;
         
         const dates = selectedFixtures.map(f => new Date(f.fixture.date).getTime());
         const minDate = new Date(Math.min(...dates));
+        // Sugerir 5 minutos antes del primer partido
         const suggestedDate = new Date(minDate.getTime() - (5 * 60 * 1000));
 
         const year = suggestedDate.getFullYear();
@@ -122,6 +132,7 @@ const CreateQuiniela = () => {
         autoSetDeadline(true);
     }, [selectedFixtures, autoSetDeadline]);
 
+    // --- CARGA DE LIGAS DESDE API ---
     const loadLeaguesFromApi = async () => {
         const CACHE_KEY = 'api_leagues_cache';
         const CACHE_TIME_KEY = 'api_leagues_cache_time';
@@ -173,6 +184,7 @@ const CreateQuiniela = () => {
         if (isManagingLeagues && apiLeaguesResults.length === 0) loadLeaguesFromApi(); 
     }, [isManagingLeagues]);
 
+    // --- CARGA INICIAL DE BORRADOR ---
     useEffect(() => {
         if (!currentAdminId) return; 
         const loadInitialDraft = async () => {
@@ -188,6 +200,7 @@ const CreateQuiniela = () => {
                     setSelectedLeagueId(d.selectedLeagueId || null);
                     if (d.selectedRound) setSelectedRound(d.selectedRound);
                     if (d.deadline) setDeadline(d.deadline);
+                    if (d.cost !== undefined) setCost(d.cost);
                 }
             } catch (error) { console.error(error); }
             finally { initialLoadRef.current = false; }
@@ -195,6 +208,7 @@ const CreateQuiniela = () => {
         loadInitialDraft();
     }, [currentAdminId]); 
 
+    // --- TIMER DE AUTOGUARDADO ---
     useEffect(() => {
         if (initialLoadRef.current || !currentAdminId || isSubmittingRef.current) return; 
         setIsSaving(true);
@@ -203,8 +217,9 @@ const CreateQuiniela = () => {
             setIsSaving(false);
         }, 1500); 
         return () => clearTimeout(timer); 
-    }, [title, description, deadline, maxFixtures]);
+    }, [title, description, deadline, maxFixtures, cost]);
 
+    // --- CARGA DE JORNADAS (ROUNDS) ---
     useEffect(() => {
         const fetchRoundsForLeague = async () => {
             if (!selectedLeagueId || initialLoadRef.current) return;
@@ -220,6 +235,7 @@ const CreateQuiniela = () => {
         fetchRoundsForLeague();
     }, [selectedLeagueId]);
 
+    // --- CARGA DE PARTIDOS (FIXTURES) ---
     const fetchFixtures = useCallback(async (leagueId, roundName) => {
         if (!leagueId || !roundName || initialLoadRef.current) {
             setApiFixtures([]);
@@ -245,12 +261,14 @@ const CreateQuiniela = () => {
         if (selectedRound && selectedLeagueId) fetchFixtures(selectedLeagueId, selectedRound);
     }, [selectedLeagueId, selectedRound, fetchFixtures]);
 
+    // --- MANEJO DE INPUTS ---
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'title') setTitle(value);
         if (name === 'description' && value.length <= MAX_DESCRIPTION_CHARS) setDescription(value);
         if (name === 'deadline') setDeadline(value);
         if (name === 'maxFixtures') setMaxFixtures(Number(value));
+        if (name === 'cost') setCost(Number(value)); 
     };
 
     const handleLeagueClick = (leagueId) => {
@@ -294,16 +312,22 @@ const CreateQuiniela = () => {
         });
     };
 
+    // --- ENVÍO DEL FORMULARIO ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!currentAdminId) return;
         isSubmittingRef.current = true;
 
+        // --- FIX CRÍTICO: Conversión de Fecha ---
+        // Convertimos la fecha del input (String corto) a ISO String completo para Firebase
+        const safeDeadline = deadline ? new Date(deadline).toISOString() : null;
+
         const quinielaPayload = {
             metadata: { 
                 title, 
                 description, 
-                deadline, 
+                deadline: safeDeadline, // <--- Usamos la fecha corregida
+                cost: Number(cost), 
                 createdBy: currentAdminId, 
                 createdAt: new Date().toISOString(), 
                 status: 'open', 
@@ -326,11 +350,14 @@ const CreateQuiniela = () => {
         const createPromise = async () => {
             await setDoc(doc(collection(db, QUINIELAS_FINAL_COLLECTION)), quinielaPayload);
             await deleteDoc(getBorradorRef(currentAdminId));
+            
+            // Reset form
             setTitle('');
             setDescription('');
             setSelectedFixtures([]);
             setSelectedLeagueId(null);
             setDeadline('');
+            setCost(100); 
         };
 
         toast.promise(createPromise(), {
@@ -351,7 +378,7 @@ const CreateQuiniela = () => {
     });
 
     const isReadyToSubmit =
-        title && deadline && selectedFixtures.length === maxFixtures && !isLoading;
+        title && deadline && selectedFixtures.length === maxFixtures && !isLoading && cost >= 0;
 
     return (
         <div className="p-4 lg:p-8 max-w-screen-2xl mx-auto w-full"> 
@@ -391,6 +418,7 @@ const CreateQuiniela = () => {
                         deadline={deadline}
                         description={description}
                         maxFixtures={maxFixtures}
+                        cost={cost} 
                         handleInputChange={handleInputChange}
                         MAX_DESCRIPTION_CHARS={MAX_DESCRIPTION_CHARS}
                     />
