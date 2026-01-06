@@ -43,7 +43,6 @@ const StatCard = ({ title, value, icon, color, trend }) => {
 const UserDashboardPage = () => {
   const [stats, setStats] = useState({
     activeQuinielasCount: 0,
-    totalPoints: 0,
     quinielasPlayed: 0,
     nextDeadline: null,
     nextDeadlineTitle: ''
@@ -62,13 +61,11 @@ const UserDashboardPage = () => {
         const partSnap = await getDocs(q);
 
         let allEntries = [];
-        let points = 0;
         let activeCount = 0;
 
         partSnap.forEach(doc => {
           const data = doc.data();
           const fechaReal = data.createdAt || data.submittedAt || new Date().toISOString();
-          points += (data.puntos || 0);
           if (data.status !== 'finalized') activeCount++;
           allEntries.push({ id: doc.id, ...data, displayDate: fechaReal });
         });
@@ -91,7 +88,6 @@ const UserDashboardPage = () => {
 
         setStats({
           activeQuinielasCount: activeCount,
-          totalPoints: points,
           quinielasPlayed: partSnap.size,
           nextDeadline: nextDate,
           nextDeadlineTitle: nextTitle
@@ -141,9 +137,8 @@ const UserDashboardPage = () => {
         <div className="text-center py-10 text-gray-500">Cargando tus estadísticas...</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <StatCard title="Quinielas Jugadas" value={stats.quinielasPlayed} color="emerald" icon="fas fa-ticket-alt" />
-            <StatCard title="Puntos Totales" value={stats.totalPoints} color="yellow" icon="fas fa-star" trend="Acumulados" />
             <StatCard title="En Juego" value={stats.activeQuinielasCount} color="blue" icon="fas fa-running" trend="Esperando resultados" />
             <StatCard title="Próximo Cierre" value={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'} color="purple" icon="fas fa-clock" trend={stats.nextDeadline ? getTimeRemaining(stats.nextDeadline) : 'Sin eventos'} />
           </div>

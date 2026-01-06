@@ -4,6 +4,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 const PaymentSettingsForm = () => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
     const [paymentConfig, setPaymentConfig] = useState({
         accountNumber: '',
         phoneNumber: '',
@@ -60,6 +62,7 @@ const PaymentSettingsForm = () => {
             loading: 'Guardando configuración de pago...',
             success: () => {
                 setIsSavingConfig(false);
+                setIsExpanded(false);
                 return '¡Configuración actualizada correctamente!';
             },
             error: (err) => {
@@ -85,82 +88,129 @@ const PaymentSettingsForm = () => {
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center">
-                <i className="fas fa-university mr-2 text-emerald-600"></i>
-                Datos de Pago (Banner)
-            </h3>
-            <form onSubmit={handleSavePaymentConfig} className="space-y-4">
-                <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
-                        Nombre del Beneficiario
-                    </label>
-                    <input 
-                        type="text" 
-                        className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={paymentConfig.beneficiaryName || ''}
-                        onChange={(e) => handleTextChange(e, 'beneficiaryName', 45)}
-                        placeholder="Nombre completo"
-                        required
-                    />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 transition-all duration-300">
+            <div 
+                className="flex justify-between items-center cursor-pointer select-none"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "Contraer" : "Click para modificar datos de pago"}
+            >
+                <h3 className="font-bold text-gray-800 flex items-center m-0">
+                    <i className="fas fa-university mr-2 text-emerald-600"></i>
+                    Datos de Pago (Banner)
+                </h3>
+                <div className="flex items-center gap-3">
+                    {!isExpanded && (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md font-black uppercase tracking-wider border border-emerald-100">
+                            Modificar
+                        </span>
+                    )}
+                    <button 
+                        type="button"
+                        className="text-gray-400 hover:text-gray-600 focus:outline-none transition-transform duration-300"
+                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    >
+                        <i className="fas fa-chevron-down"></i>
+                    </button>
                 </div>
+            </div>
 
-                <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
-                        Banco
-                    </label>
-                    <input 
-                        type="text" 
-                        className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={paymentConfig.bankName || ''}
-                        onChange={(e) => handleTextChange(e, 'bankName', 30)}
-                        placeholder="Nombre del banco"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
-                        N° Tarjeta (16 dígitos)
-                    </label>
-                    <input 
-                        type="text" 
-                        className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={paymentConfig.accountNumber}
-                        onChange={(e) => handleNumberChange(e, 'accountNumber', 16)}
-                        placeholder="0000 0000 0000 0000"
-                        required
-                    />
-                    <p className="text-[9px] text-gray-400 mt-1">
-                        Dígitos: {paymentConfig.accountNumber.length}/16
-                    </p>
-                </div>
-
-                <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
-                        Celular (10 dígitos)
-                    </label>
-                    <input 
-                        type="text" 
-                        className="w-full mt-1 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={paymentConfig.phoneNumber}
-                        onChange={(e) => handleNumberChange(e, 'phoneNumber', 10)}
-                        placeholder="9611234567"
-                        required
-                    />
-                    <p className="text-[9px] text-gray-400 mt-1">
-                        Dígitos: {paymentConfig.phoneNumber.length}/10
-                    </p>
-                </div>
-
-                <button 
-                    type="submit"
-                    disabled={isSavingConfig}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-50 shadow-md"
+            {isExpanded && (
+                <form 
+                    onSubmit={handleSavePaymentConfig} 
+                    className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300"
                 >
-                    {isSavingConfig ? 'Guardando...' : 'Actualizar Información'}
-                </button>
-            </form>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
+                                Nombre del Beneficiario
+                            </label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                value={paymentConfig.beneficiaryName || ''}
+                                onChange={(e) => handleTextChange(e, 'beneficiaryName', 45)}
+                                placeholder="Nombre completo"
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
+                                Banco
+                            </label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                value={paymentConfig.bankName || ''}
+                                onChange={(e) => handleTextChange(e, 'bankName', 30)}
+                                placeholder="Nombre del banco"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
+                                N° Tarjeta (16 dígitos)
+                            </label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                value={paymentConfig.accountNumber}
+                                onChange={(e) => handleNumberChange(e, 'accountNumber', 16)}
+                                placeholder="0000 0000 0000 0000"
+                                required
+                            />
+                            <div className="flex justify-between items-center px-1">
+                                <p className="text-[9px] text-gray-400">Solo números</p>
+                                <p className={`text-[9px] font-bold ${paymentConfig.accountNumber.length === 16 ? 'text-emerald-500' : 'text-gray-400'}`}>
+                                    {paymentConfig.accountNumber.length}/16
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
+                                Celular (10 dígitos)
+                            </label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                value={paymentConfig.phoneNumber}
+                                onChange={(e) => handleNumberChange(e, 'phoneNumber', 10)}
+                                placeholder="9611234567"
+                                required
+                            />
+                            <div className="flex justify-between items-center px-1">
+                                <p className="text-[9px] text-gray-400">WhatsApp/Contacto</p>
+                                <p className={`text-[9px] font-bold ${paymentConfig.phoneNumber.length === 10 ? 'text-emerald-500' : 'text-gray-400'}`}>
+                                    {paymentConfig.phoneNumber.length}/10
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-2 flex gap-3">
+                        <button 
+                            type="button"
+                            onClick={() => setIsExpanded(false)}
+                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2.5 rounded-lg text-sm font-bold transition-all"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit"
+                            disabled={isSavingConfig}
+                            className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-50 shadow-lg shadow-emerald-100"
+                        >
+                            {isSavingConfig ? (
+                                <><i className="fas fa-spinner fa-spin mr-2"></i>Guardando...</>
+                            ) : 'Actualizar Información'}
+                        </button>
+                    </div>
+                </form>
+            )}
         </div>
     );
 };
