@@ -35,7 +35,8 @@ const QuinielaDetail = () => {
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando detalles...</div>;
     if (!quiniela) return null;
 
-    const deadlineDate = new Date(quiniela.metadata.deadline);
+    const deadlineDate = quiniela.metadata.deadline.toDate(); 
+    
     const now = new Date();
     const isOpen = now < deadlineDate;
     const totalMatches = quiniela.fixtures ? quiniela.fixtures.length : 0;

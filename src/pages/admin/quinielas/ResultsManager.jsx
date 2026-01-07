@@ -56,31 +56,7 @@ const ResultsManager = () => {
         fetchQuiniela();
     }, [quinielaId, navigate]);
 
-    const toggleLock = (fixtureId) => {
-        if (!quiniela) return;
-
-        const updatedFixtures = quiniela.fixtures.map(f => {
-            if (f.id === fixtureId) {
-                const newLockStatus = !f.isLocked;
-                toast.info(newLockStatus ? "Partido bloqueado" : "Partido desbloqueado");
-                return {
-                    ...f,
-                    isLocked: newLockStatus,
-                    lockedAt: newLockStatus ? new Date().toISOString() : null
-                };
-            }
-            return f;
-        });
-
-        setQuiniela({ ...quiniela, fixtures: updatedFixtures });
-    };
-
-    const handleScoreChange = (fixtureId, team, value) => {
-        setEditingScores(prev => ({
-            ...prev,
-            [fixtureId]: { ...prev[fixtureId], [team]: value }
-        }));
-    };
+    // SE ELIMINÓ LA FUNCIÓN toggleLock PARA EVITAR BLOQUEOS MANUALES
 
     const determineOutcome = (homeScore, awayScore, fixtureStatus = 'FT') => {
         const INVALID_STATUSES = ['CANC', 'PST', 'SUSP', 'ABD', 'WO', 'INT'];
@@ -105,7 +81,7 @@ const ResultsManager = () => {
 
         try {
             const promises = quiniela.fixtures.map(async (fixture) => {
-                if (fixture.isLocked) return { skipped: true, fixture: { id: fixture.id } };
+                // YA NO SE SALTA NINGÚN PARTIDO. SIEMPRE CONSULTA LA API.
                 const data = await fetchFromApi('fixtures', `?id=${fixture.id}&timezone=America/Mexico_City`);
                 return data.response[0];
             });
@@ -113,19 +89,17 @@ const ResultsManager = () => {
             const results = await Promise.all(promises);
             const newScores = { ...editingScores };
             let updatesCount = 0;
-            let skippedCount = 0;
             const updatedFixturesLocal = [...quiniela.fixtures];
 
             results.forEach(match => {
                 if (!match) return;
-                if (match.skipped) {
-                    skippedCount++;
-                    return;
-                }
 
                 const fixtureIndex = updatedFixturesLocal.findIndex(f => f.id === match.fixture.id);
                 if (fixtureIndex !== -1) {
                     updatedFixturesLocal[fixtureIndex].status = match.fixture.status.short;
+                    // Aseguramos que se quite cualquier bloqueo residual
+                    delete updatedFixturesLocal[fixtureIndex].isLocked;
+                    delete updatedFixturesLocal[fixtureIndex].lockedAt;
                 }
 
                 if (['FT', 'AET', 'PEN'].includes(match.fixture.status.short)) {
@@ -138,8 +112,7 @@ const ResultsManager = () => {
             setQuiniela({ ...quiniela, fixtures: updatedFixturesLocal });
 
             toast.success(`Sincronización lista: ${updatesCount} partidos actualizados`, {
-                id: loadingToast,
-                description: skippedCount > 0 ? `${skippedCount} omitidos por candado.` : null
+                id: loadingToast
             });
         } catch (error) {
             toast.error("Error al conectar con la API", { id: loadingToast });
@@ -175,6 +148,10 @@ const ResultsManager = () => {
             const updatedFixtures = quiniela.fixtures.map(fixture => {
                 const newScore = editingScores[fixture.id];
                 let updatedFixture = { ...fixture };
+
+                // Limpieza de propiedades legacy
+                delete updatedFixture.isLocked;
+                delete updatedFixture.lockedAt;
 
                 if (newScore && newScore.home !== undefined && newScore.away !== undefined) {
                     const statusToCheck = fixture.status?.short || fixture.status || 'FT';
@@ -267,15 +244,19 @@ const ResultsManager = () => {
                     </Link>
                     <h2 className="text-2xl font-bold text-gray-800">Resultados & Cálculo</h2>
                     <p className="text-sm text-gray-500">{quiniela?.metadata?.title}</p>
+                    <p className="text-xs text-blue-600 mt-1 font-medium bg-blue-50 inline-block px-2 py-1 rounded">
+                        <i className="fas fa-robot mr-1"></i>
+                        Modo Automático: Resultados sincronizados vía API.
+                    </p>
                 </div>
 
                 <div className="flex gap-2">
                     <button
                         onClick={syncWithApi}
                         disabled={isSyncing || isProcessing}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-2"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm"
                     >
-                        {isSyncing ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-magic"></i>}
+                        {isSyncing ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-cloud-download-alt"></i>}
                         Sincronizar API
                     </button>
                     <button
@@ -290,14 +271,14 @@ const ResultsManager = () => {
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700">Marcadores Oficiales</h3>
+                    <h3 className="font-bold text-gray-700">Marcadores Oficiales (API)</h3>
                 </div>
 
                 <div className="divide-y divide-gray-100">
                     {quiniela?.fixtures?.map((fixture) => (
                         <div
                             key={fixture.id}
-                            className={`flex flex-col md:flex-row items-center justify-between p-4 hover:bg-gray-50 transition-colors ${fixture.isLocked ? 'bg-red-50/30' : ''}`}
+                            className="flex flex-col md:flex-row items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                         >
                             <div className="flex items-center gap-3 w-full md:w-1/3 mb-2 md:mb-0">
                                 <span className="text-sm font-semibold text-right w-full truncate text-gray-700">
@@ -312,33 +293,26 @@ const ResultsManager = () => {
                             </div>
 
                             <div className="flex items-center gap-4 mx-4">
-                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-inner">
+                                    {/* INPUT LOCAL - READONLY Y SIN BOTONES */}
                                     <input
                                         type="number"
-                                        className="w-12 h-10 text-center font-bold text-xl outline-none"
+                                        className="w-12 h-10 text-center font-bold text-xl outline-none bg-transparent text-gray-600 cursor-default"
                                         value={editingScores[fixture.id]?.home ?? ''}
-                                        onChange={(e) => !fixture.isLocked && handleScoreChange(fixture.id, 'home', e.target.value)}
+                                        readOnly
                                         placeholder="-"
-                                        disabled={isProcessing || fixture.isLocked}
                                     />
                                     <span className="text-gray-300 font-bold">:</span>
+                                    {/* INPUT VISITANTE - READONLY Y SIN BOTONES */}
                                     <input
                                         type="number"
-                                        className="w-12 h-10 text-center font-bold text-xl outline-none"
+                                        className="w-12 h-10 text-center font-bold text-xl outline-none bg-transparent text-gray-600 cursor-default"
                                         value={editingScores[fixture.id]?.away ?? ''}
-                                        onChange={(e) => !fixture.isLocked && handleScoreChange(fixture.id, 'away', e.target.value)}
+                                        readOnly
                                         placeholder="-"
-                                        disabled={isProcessing || fixture.isLocked}
                                     />
                                 </div>
-                                <button
-                                    onClick={() => toggleLock(fixture.id)}
-                                    className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
-                                        fixture.isLocked ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-400'
-                                    }`}
-                                >
-                                    <i className={`fas fa-${fixture.isLocked ? 'lock' : 'unlock'}`}></i>
-                                </button>
+                                {/* SE ELIMINÓ EL BOTÓN DEL CANDADO AQUÍ */}
                             </div>
 
                             <div className="flex items-center gap-3 w-full md:w-1/3 justify-end mt-2 md:mt-0">
