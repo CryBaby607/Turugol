@@ -16,6 +16,10 @@ const Leaderboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Estados para Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+
     useEffect(() => {
         const fetchQuinielaInfo = async () => {
             if (!quinielaId) {
@@ -84,6 +88,20 @@ const Leaderboard = () => {
         return <span className="font-bold text-gray-500 text-lg">#{rank}</span>;
     };
 
+    // Lógica de Paginación
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = leaderboard.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(leaderboard.length / itemsPerPage);
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(prev => prev - 1);
+    };
+
     if (error) {
         return (
             <div className="max-w-4xl mx-auto p-8 text-center">
@@ -119,7 +137,7 @@ const Leaderboard = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative min-h-[300px]">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative min-h-[300px] flex flex-col">
                 {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10">
                         <i className="fas fa-circle-notch fa-spin text-4xl text-emerald-500 mb-3"></i>
@@ -131,66 +149,84 @@ const Leaderboard = () => {
                         <p>No hay participantes registrados aún.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 text-[10px] md:text-xs uppercase tracking-widest text-gray-400 border-b border-gray-100">
-                                    <th className="p-4 font-black text-center w-20">Lugar</th>
-                                    <th className="p-4 font-black">Jugador</th>
-                                    <th className="p-4 font-black text-center">Puntos</th>
-                                    <th className="p-4 font-black text-center hidden sm:table-cell">Pago</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-sm">
-                                {leaderboard.map((entry) => {
-                                    const isMe = entry.userId === currentUser?.uid;
-                                    return (
-                                        <tr key={entry.id} className={`border-b border-gray-50 last:border-0 transition-colors ${isMe ? 'bg-emerald-50/60' : 'hover:bg-gray-50'}`}>
-                                            <td className="p-4 text-center">{getRankIcon(entry.rank)}</td>
-                                            <td className="p-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm ${isMe ? 'bg-emerald-500' : 'bg-gradient-to-br from-indigo-400 to-blue-500'}`}>
-                                                        {entry.userName ? entry.userName.charAt(0).toUpperCase() : '?'}
+                    <>
+                        <div className="overflow-x-auto flex-grow">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 text-[10px] md:text-xs uppercase tracking-widest text-gray-400 border-b border-gray-100">
+                                        <th className="p-4 font-black text-center w-20">Lugar</th>
+                                        <th className="p-4 font-black">Jugador</th>
+                                        <th className="p-4 font-black text-center">Puntos</th>
+                                        <th className="p-4 font-black text-center hidden sm:table-cell">Pago</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    {currentItems.map((entry) => {
+                                        const isMe = entry.userId === currentUser?.uid;
+                                        return (
+                                            <tr key={entry.id} className={`border-b border-gray-50 last:border-0 transition-colors ${isMe ? 'bg-emerald-50/60' : 'hover:bg-gray-50'}`}>
+                                                <td className="p-4 text-center">{getRankIcon(entry.rank)}</td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shadow-sm ${isMe ? 'bg-emerald-500' : 'bg-gradient-to-br from-indigo-400 to-blue-500'}`}>
+                                                            {entry.userName ? entry.userName.charAt(0).toUpperCase() : '?'}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-bold text-sm md:text-base leading-tight ${isMe ? 'text-emerald-900' : 'text-gray-700'}`}>
+                                                                {entry.userName} 
+                                                                {isMe && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-200 text-emerald-800 uppercase tracking-wide">Tú</span>}
+                                                            </span>
+                                                            {isAdmin && (
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1 rounded border border-gray-200">
+                                                                        ID: {entry.userId?.substring(0, 6)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className={`font-bold text-sm md:text-base leading-tight ${isMe ? 'text-emerald-900' : 'text-gray-700'}`}>
-                                                            {entry.userName} 
-                                                            {isMe && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-200 text-emerald-800 uppercase tracking-wide">Tú</span>}
-                                                        </span>
-                                                        {isAdmin && (
-                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1 rounded border border-gray-200">
-                                                                    ID: {entry.userId?.substring(0, 6)}
-                                                                </span>
-                                                            </div>
-                                                        )}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <div className={`inline-flex items-center justify-center w-12 h-10 rounded-xl font-black text-lg shadow-sm ${isMe ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
+                                                        {entry.puntos || 0}
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <div className={`inline-flex items-center justify-center w-12 h-10 rounded-xl font-black text-lg shadow-sm ${isMe ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
-                                                    {entry.puntos || 0}
-                                                </div>
-                                            </td>
-                                            <td className="p-4 text-center hidden sm:table-cell">
-                                                {entry.paymentStatus === 'paid' ? (
-                                                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-100" title="Pago Verificado">
-                                                        <i className="fas fa-check-circle"></i>
-                                                        <span className="hidden md:inline">OK</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded-full text-xs font-bold border border-yellow-100" title="Pago Pendiente">
-                                                        <i className="fas fa-clock"></i>
-                                                        <span className="hidden md:inline">Pend</span>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                                </td>
+                                                <td className="p-4 text-center hidden sm:table-cell">
+                                                    {entry.paymentStatus === 'paid' ? (
+                                                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-100" title="Pago Verificado">
+                                                            <i className="fas fa-check-circle"></i>
+                                                            <span className="hidden md:inline">OK</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-600 rounded-full text-xs font-bold border border-yellow-100" title="Pago Pendiente">
+                                                            <i className="fas fa-clock"></i>
+                                                            <span className="hidden md:inline">Pend</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Controles de Paginación */}
+                        {totalPages > 1 && (
+                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                                <span className="text-xs text-gray-500">Mostrando {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, leaderboard.length)} de {leaderboard.length}</span>
+                                <div className="flex gap-2">
+                                    <button onClick={handlePrevPage} disabled={currentPage === 1} className="px-3 py-1 text-xs font-bold rounded-lg border bg-white disabled:opacity-50 hover:bg-gray-100">
+                                        <i className="fas fa-chevron-left"></i>
+                                    </button>
+                                    <span className="text-xs font-bold px-2 py-1">{currentPage} / {totalPages}</span>
+                                    <button onClick={handleNextPage} disabled={currentPage === totalPages} className="px-3 py-1 text-xs font-bold rounded-lg border bg-white disabled:opacity-50 hover:bg-gray-100">
+                                        <i className="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
