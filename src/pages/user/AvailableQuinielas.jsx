@@ -4,19 +4,12 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { Link } from 'react-router-dom'; 
 
 const AvailableQuinielas = () => {
-  const [quinielas, setQuinielas] = useState([]);
+  const [quinielas, setQuiniela] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados para Paginación
+  // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
-
-  // Helper de fecha
-  const getSafeDate = (dateVal) => {
-    if (!dateVal) return new Date();
-    if (dateVal.toDate) return dateVal.toDate();
-    return new Date(dateVal);
-  };
 
   useEffect(() => {
     const fetchQuinielas = async () => {
@@ -28,11 +21,11 @@ const AvailableQuinielas = () => {
         const docs = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(q => {
-             const deadline = getSafeDate(q.metadata.deadline);
-             return deadline > now;
+             // Uso directo de .toDate() asumiendo Timestamp
+             return q.metadata.deadline?.toDate() > now;
           });
           
-        setQuinielas(docs);
+        setQuiniela(docs);
       } catch (error) {
         console.error("Error al cargar quinielas:", error);
       } finally {
@@ -42,22 +35,24 @@ const AvailableQuinielas = () => {
     fetchQuinielas();
   }, []);
 
-  const formatDate = (dateVal) => {
-    const date = getSafeDate(dateVal);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
     return new Intl.DateTimeFormat('es-MX', { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long', 
       hour: '2-digit', 
       minute: '2-digit' 
-    }).format(date);
+    }).format(timestamp.toDate());
   };
 
-  const getTimeRemaining = (dateVal) => {
-    const date = getSafeDate(dateVal);
+  const getTimeRemaining = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate();
     const total = date - new Date();
     const hours = Math.floor((total / (1000 * 60 * 60)));
     const days = Math.floor(hours / 24);
+    
     if (days > 0) return `${days} días restantes`;
     if (hours > 0) return `${hours} horas restantes`;
     return "¡Cierra pronto!";
@@ -98,8 +93,9 @@ const AvailableQuinielas = () => {
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {currentQuinielas.map((q) => {
-                const deadlineDate = getSafeDate(q.metadata.deadline);
+                const deadlineDate = q.metadata.deadline.toDate();
                 const isUrgent = (deadlineDate - new Date()) < (24 * 60 * 60 * 1000);
+                
                 return (
                 <div key={q.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col border border-gray-100 group">
                     <div className="bg-emerald-600 p-4 relative overflow-hidden">
@@ -134,7 +130,6 @@ const AvailableQuinielas = () => {
             })}
             </div>
 
-            {/* Controles de Paginación */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center gap-4 pb-8">
                     <button onClick={handlePrevPage} disabled={currentPage === 1} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>

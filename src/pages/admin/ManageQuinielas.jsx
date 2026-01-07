@@ -1,215 +1,138 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { db } from '../../firebase/config';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 
 const ManageQuinielas = () => {
     const [quinielas, setQuinielas] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('active');
+    
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 9;
+    const [filter, setFilter] = useState('active');
 
     useEffect(() => {
-        const fetchQuinielas = async () => {
-            setLoading(true);
-            try {
-                const querySnapshot = await getDocs(collection(db, 'quinielas'));
-                const quinielasData = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setQuinielas(
-                    quinielasData.sort(
-                        (a, b) =>
-                            b.metadata.createdAt.toDate() -
-                            a.metadata.createdAt.toDate()
-                    )
-                );
-            } catch (error) {
-                console.error("Error al cargar quinielas:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchQuinielas();
     }, []);
 
+    const fetchQuinielaData = async () => {
+        const q = query(collection(db, "quinielas"), orderBy("metadata.createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    };
+
+    const fetchQuinielas = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchQuinielaData();
+            setQuinielas(data);
+        } catch (error) {
+            console.error("Error:", error);
+            toast.error("Error al cargar quinielas");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        const result = await Swal.fire({
+            title: '¿Estás seguro?',
+            text: "No podrás revertir esto.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await deleteDoc(doc(db, "quinielas", id));
+                setQuinielas(prev => prev.filter(q => q.id !== id));
+                toast.success('Quiniela eliminada.');
+            } catch (error) {
+                toast.error('Error al eliminar.');
+            }
+        }
+    };
+
     const now = new Date();
-
-    const activeQuinielas = quinielas.filter(
-        q => q.metadata.deadline.toDate() > now
-    );
-    const historyQuinielas = quinielas.filter(
-        q => q.metadata.deadline.toDate() <= now
-    );
-
-    const allFilteredQuinielas =
-        activeTab === 'active' ? activeQuinielas : historyQuinielas;
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [activeTab]);
+    const filteredQuinielas = quinielas.filter(q => {
+        const deadline = q.metadata.deadline?.toDate ? q.metadata.deadline.toDate() : new Date();
+        return filter === 'active' ? deadline > now : deadline <= now;
+    });
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentQuinielas = allFilteredQuinielas.slice(
-        indexOfFirstItem,
-        indexOfLastItem
-    );
-
-    const totalPages = Math.ceil(
-        allFilteredQuinielas.length / itemsPerPage
-    );
-
-    const handleNextPage = () => {
-        if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
-    };
-
-    const handlePrevPage = () => {
-        if (currentPage > 1) setCurrentPage(prev => prev - 1);
-    };
+    const currentItems = filteredQuinielas.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredQuinielas.length / itemsPerPage);
 
     return (
-        <div className="max-w-7xl mx-auto p-4 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-800">
-                    Gestionar Quinielas
-                </h2>
-                <div className="bg-gray-200 p-1 rounded-lg flex space-x-1 mt-4 md:mt-0">
-                    <button
-                        onClick={() => setActiveTab('active')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                            activeTab === 'active'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        En Juego ({activeQuinielas.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('history')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                            activeTab === 'history'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        Historial ({historyQuinielas.length})
-                    </button>
-                </div>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <h1 className="text-2xl font-bold text-gray-800">Administrar Quinielas</h1>
+            </div>
+
+            <div className="flex gap-4 mb-6 border-b border-gray-200">
+                <button onClick={() => { setFilter('active'); setCurrentPage(1); }} className={`pb-2 px-4 font-medium transition-colors ${filter === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                    En Juego
+                </button>
+                <button onClick={() => { setFilter('history'); setCurrentPage(1); }} className={`pb-2 px-4 font-medium transition-colors ${filter === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                    Historial
+                </button>
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-20">
-                    <p className="text-gray-500 animate-pulse">
-                        Cargando quinielas...
-                    </p>
+                <div className="text-center py-10 text-gray-500">Cargando...</div>
+            ) : filteredQuinielas.length === 0 ? (
+                <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                    <p className="text-gray-500">No hay quinielas en esta sección.</p>
                 </div>
             ) : (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {currentQuinielas.map(q => {
-                            const deadlineDate =
-                                q.metadata.deadline.toDate();
-                            const isOpen =
-                                new Date() < deadlineDate;
-
-                            return (
-                                <div
-                                    key={q.id}
-                                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative animate-in fade-in duration-300"
-                                >
-                                    <div className="p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <span
-                                                className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                                    isOpen
-                                                        ? 'bg-green-50 text-green-700 border-green-200'
-                                                        : 'bg-gray-100 text-gray-600 border-gray-200'
-                                                }`}
-                                            >
-                                                {isOpen
-                                                    ? 'ABIERTA'
-                                                    : 'CERRADA'}
-                                            </span>
-                                            <small className="text-gray-400 text-xs font-mono">
-                                                ID: {q.id.substring(0, 6)}
-                                            </small>
+                        {currentItems.map((quiniela) => (
+                            <div key={quiniela.id} className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+                                <div className="p-5 flex-grow">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded uppercase">
+                                            {quiniela.metadata.type || 'Standard'}
+                                        </span>
+                                        <div className="flex gap-1">
+                                            <Link to={`/dashboard/admin/quinielas/${quiniela.id}`} className="text-gray-400 hover:text-blue-600 p-1"><i className="fas fa-eye"></i></Link>
+                                            <button onClick={() => handleDelete(quiniela.id)} className="text-gray-400 hover:text-red-600 p-1"><i className="fas fa-trash"></i></button>
                                         </div>
-
-                                        <h3
-                                            className="font-bold text-lg text-gray-900 mb-1 truncate"
-                                            title={q.metadata.title}
-                                        >
-                                            {q.metadata.title}
-                                        </h3>
-
-                                        <p className="text-xs text-gray-500 mb-4">
-                                            Cierre:{' '}
-                                            {deadlineDate.toLocaleDateString()}
-                                        </p>
-
-                                        <Link
-                                            to={`/dashboard/admin/quinielas/${q.id}`}
-                                            className="block w-full text-center py-2.5 rounded-lg font-bold text-sm transition-colors border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white mt-4"
-                                        >
-                                            <i className="fas fa-cog mr-2"></i>
-                                            Administrar
-                                        </Link>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-800 mb-1 line-clamp-1">{quiniela.metadata.title}</h3>
+                                    
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        Cierre: {quiniela.metadata.deadline?.toDate ? quiniela.metadata.deadline.toDate().toLocaleDateString() : 'N/A'}
+                                    </p>
+                                    
+                                    <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <i className="fas fa-users text-gray-400"></i>
+                                            <span>Participantes</span>
+                                        </div>
+                                        <span className="font-bold">0</span> 
                                     </div>
                                 </div>
-                            );
-                        })}
-
-                        {allFilteredQuinielas.length === 0 && (
-                            <div className="col-span-full py-10 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                                <i className="fas fa-folder-open text-gray-300 text-4xl mb-3"></i>
-                                <p className="text-gray-500">
-                                    No hay quinielas en esta sección.
-                                </p>
+                                <div className="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400">ID: {quiniela.id.substring(0,6)}...</span>
+                                    <Link to={`/dashboard/admin/quinielas/${quiniela.id}`} className="text-sm font-bold text-emerald-600 hover:underline">Gestionar &rarr;</Link>
+                                </div>
                             </div>
-                        )}
+                        ))}
                     </div>
 
-                    {allFilteredQuinielas.length > itemsPerPage && (
-                        <div className="flex justify-center items-center gap-4 mt-8 pb-4">
-                            <button
-                                onClick={handlePrevPage}
-                                disabled={currentPage === 1}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                                    currentPage === 1
-                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-blue-300'
-                                }`}
-                            >
-                                <i className="fas fa-chevron-left"></i>
-                                Anterior
-                            </button>
-
-                            <span className="text-sm font-medium text-gray-500">
-                                Página{' '}
-                                <span className="text-gray-900 font-bold">
-                                    {currentPage}
-                                </span>{' '}
-                                de{' '}
-                                <span className="text-gray-900 font-bold">
-                                    {totalPages}
-                                </span>
-                            </span>
-
-                            <button
-                                onClick={handleNextPage}
-                                disabled={currentPage === totalPages}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                                    currentPage === totalPages
-                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-blue-300'
-                                }`}
-                            >
-                                Siguiente
-                                <i className="fas fa-chevron-right"></i>
-                            </button>
+                    {totalPages > 1 && (
+                        <div className="flex justify-center gap-2">
+                            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+                            <span className="px-3 py-1">Página {currentPage} de {totalPages}</span>
+                            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded disabled:opacity-50">Siguiente</button>
                         </div>
                     )}
                 </>
