@@ -25,7 +25,7 @@ const StatCard = ({ title, value, icon, color, trend }) => {
           <p className="text-sm font-medium opacity-80 mb-1">{title}</p>
           <h3 className={`text-3xl font-bold ${textColors[color]}`}>{value}</h3>
         </div>
-        <div className={`p-2 rounded-lg bg-white bg-opacity-40`}>
+        <div className="p-2 rounded-lg bg-white bg-opacity-40">
           <i className={`${icon} text-xl`}></i>
         </div>
       </div>
@@ -65,7 +65,6 @@ const UserDashboardPage = () => {
 
         partSnap.forEach(doc => {
           const data = doc.data();
-          // Asumiendo que createdAt es Timestamp
           const fechaObj = data.createdAt?.toDate() || new Date(); 
           if (data.status !== 'finalized') activeCount++;
           allEntries.push({ id: doc.id, ...data, displayDate: fechaObj });
@@ -76,15 +75,18 @@ const UserDashboardPage = () => {
 
         const quinielasRef = collection(db, 'quinielas');
         const now = new Date();
-        // Query directa: Firestore compara Timestamp con Date JS automáticamente
-        const qDeadline = query(quinielasRef, where('metadata.deadline', '>', now), orderBy('metadata.deadline', 'asc'), limit(1));
+        const qDeadline = query(
+          quinielasRef,
+          where('metadata.deadline', '>', now),
+          orderBy('metadata.deadline', 'asc'),
+          limit(1)
+        );
         const deadlineSnap = await getDocs(qDeadline);
 
         let nextDate = null;
         let nextTitle = 'No hay quinielas';
         if (!deadlineSnap.empty) {
           const qData = deadlineSnap.docs[0].data();
-          // Lectura directa
           nextDate = qData.metadata.deadline?.toDate();
           nextTitle = qData.metadata.title;
         }
@@ -120,15 +122,23 @@ const UserDashboardPage = () => {
     <>
       <div className="mb-8 bg-gradient-to-r from-emerald-600 to-teal-500 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold mb-2">¡Hola, {user?.displayName?.split(' ')[0] || 'Jugador'}! 👋</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            ¡Hola, {user?.displayName?.split(' ')[0] || 'Jugador'}! 👋
+          </h1>
           <p className="text-emerald-100 opacity-90 text-lg">
             Tienes <span className="font-bold text-white">{stats.activeQuinielasCount} quinielas</span> activas en este momento.
           </p>
           <div className="mt-6 flex gap-3">
-            <Link to="/dashboard/user/available-quinielas" className="bg-white text-emerald-700 px-5 py-2 rounded-lg font-bold shadow hover:bg-emerald-50 transition-colors">
+            <Link
+              to="/dashboard/user/available-quinielas"
+              className="bg-white text-emerald-700 px-5 py-2 rounded-lg font-bold shadow hover:bg-emerald-50 transition-colors"
+            >
               <i className="fas fa-plus-circle mr-2"></i>Nueva Quiniela
             </Link>
-            <Link to="/dashboard/user/history" className="bg-emerald-700 bg-opacity-40 text-white border border-emerald-400 px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors">
+            <Link
+              to="/dashboard/user/history"
+              className="bg-emerald-700 bg-opacity-40 text-white border border-emerald-400 px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+            >
               Ver Historial
             </Link>
           </div>
@@ -143,28 +153,41 @@ const UserDashboardPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <StatCard title="Quinielas Jugadas" value={stats.quinielasPlayed} color="emerald" icon="fas fa-ticket-alt" />
             <StatCard title="En Juego" value={stats.activeQuinielasCount} color="blue" icon="fas fa-running" trend="Esperando resultados" />
-            <StatCard title="Próximo Cierre" value={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'} color="purple" icon="fas fa-clock" trend={stats.nextDeadline ? getTimeRemaining(stats.nextDeadline) : 'Sin eventos'} />
+            <StatCard
+              title="Próximo Cierre"
+              value={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+              color="purple"
+              icon="fas fa-clock"
+              trend={stats.nextDeadline ? getTimeRemaining(stats.nextDeadline) : 'Sin eventos'}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800">Actividad Reciente</h3>
-                <Link to="/dashboard/user/history" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Ver todo</Link>
+                <Link to="/dashboard/user/history" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                  Ver todo
+                </Link>
               </div>
               <div className="space-y-4">
                 {recentActivity.length === 0 ? (
                   <p className="text-gray-400 text-center py-4">No hay actividad reciente.</p>
                 ) : (
                   recentActivity.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-50 last:border-0">
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-50 last:border-0"
+                    >
                       <div className="flex items-center space-x-4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${item.status === 'finalized' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                           <i className="fas fa-futbol"></i>
                         </div>
                         <div>
                           <p className="font-semibold text-gray-800">{item.quinielaName}</p>
-                          <p className="text-xs text-gray-500">{item.displayDate.toLocaleDateString()} • {item.status === 'finalized' ? 'Finalizado' : 'Pendiente'}</p>
+                          <p className="text-xs text-gray-500">
+                            {item.displayDate.toLocaleDateString()} • {item.status === 'finalized' ? 'Finalizado' : 'Pendiente'}
+                          </p>
                         </div>
                       </div>
                       <span className={`px-3 py-1 text-xs font-bold rounded-full ${item.status === 'finalized' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -181,7 +204,9 @@ const UserDashboardPage = () => {
               <p className="text-indigo-700 text-sm mb-4">
                 Puedes consultar la tabla de posiciones (Leaderboard) de cada quiniela desde tu historial para ver cómo vas contra otros jugadores.
               </p>
-              <Link to="/dashboard/user/history" className="text-sm font-bold text-indigo-600 hover:underline">Ir al Ranking &rarr;</Link>
+              <Link to="/dashboard/user/history" className="text-sm font-bold text-indigo-600 hover:underline">
+                Ir al Ranking &rarr;
+              </Link>
             </div>
           </div>
         </>

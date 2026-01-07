@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, auth } from '../../firebase/config'; 
-// IMPORTANTE: Importamos Timestamp
 import { doc, setDoc, getDoc, deleteDoc, collection, Timestamp } from 'firebase/firestore'; 
 import { fetchFromApi } from '../../services/footballApi';
 
@@ -296,8 +295,6 @@ const CreateQuiniela = () => {
         if (!currentAdminId) return;
         isSubmittingRef.current = true;
 
-        // ESTANDARIZACIÓN A TIMESTAMP
-        // 1. Deadline es Timestamp.fromDate()
         const safeDeadline = deadline ? Timestamp.fromDate(new Date(deadline)) : null;
 
         const quinielaPayload = {
@@ -307,7 +304,6 @@ const CreateQuiniela = () => {
                 deadline: safeDeadline, 
                 cost: Number(cost), 
                 createdBy: currentAdminId, 
-                // 2. CreatedAt es Timestamp.now()
                 createdAt: Timestamp.now(), 
                 status: 'open', 
                 maxFixtures 

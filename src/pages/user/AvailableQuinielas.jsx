@@ -17,7 +17,6 @@ const AvailableQuinielas = () => {
         const docs = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(q => {
-             // Lectura directa de Timestamp
              return q.metadata.deadline?.toDate() > now;
           });
           
@@ -78,13 +77,19 @@ const AvailableQuinielas = () => {
 
                 <div className="p-6 flex-grow flex flex-col justify-between">
                   <div>
-                    <p className="text-gray-500 text-sm mb-4 line-clamp-2">{q.metadata.description || "Participa pronosticando los resultados de esta jornada."}</p>
+                    <p className="text-gray-500 text-sm mb-4 line-clamp-2">
+                      {q.metadata.description || "Participa pronosticando los resultados de esta jornada."}
+                    </p>
                     <div className="flex items-center text-sm text-gray-600 bg-gray-50 p-3 rounded-lg mb-4">
                       <i className={`fas fa-clock mr-2 ${isUrgent ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}></i>
                       <div>
                         <p className="font-semibold">Cierre de apuestas:</p>
                         <p className="text-xs">{formatDate(q.metadata.deadline)}</p>
-                        {isUrgent && <p className="text-xs text-red-500 font-bold mt-1">{getTimeRemaining(q.metadata.deadline)}</p>}
+                        {isUrgent && (
+                          <p className="text-xs text-red-500 font-bold mt-1">
+                            {getTimeRemaining(q.metadata.deadline)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

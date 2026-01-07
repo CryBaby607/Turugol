@@ -54,9 +54,8 @@ const AdminDashboardPage = () => {
 
                 const now = new Date();
 
-                // Filtrado con .toDate()
-                const active = quinielasData.filter(q =>
-                    q.metadata?.deadline?.toDate() > now
+                const active = quinielasData.filter(
+                    q => q.metadata?.deadline?.toDate() > now
                 );
 
                 const deadlines = active
@@ -104,7 +103,10 @@ const AdminDashboardPage = () => {
                     <p className="text-gray-500">Bienvenido de nuevo, Administrador.</p>
                 </div>
                 <div className="flex gap-3">
-                    <Link to="/dashboard/admin/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm flex items-center">
+                    <Link
+                        to="/dashboard/admin/create"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm flex items-center"
+                    >
                         <i className="fas fa-plus mr-2"></i> Nueva Quiniela
                     </Link>
                 </div>
@@ -132,7 +134,11 @@ const AdminDashboardPage = () => {
                     value={stats.nextDeadline ? stats.nextDeadline.toLocaleDateString() : 'N/A'}
                     icon="fas fa-calendar-day"
                     color="text-orange-600 bg-orange-600"
-                    subtext={stats.nextDeadline ? stats.nextDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sin pendientes'}
+                    subtext={
+                        stats.nextDeadline
+                            ? stats.nextDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : 'Sin pendientes'
+                    }
                     loading={loading}
                 />
             </div>
@@ -141,7 +147,12 @@ const AdminDashboardPage = () => {
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                         <h3 className="font-bold text-gray-800">Actividad Reciente</h3>
-                        <Link to="/dashboard/admin/manage" className="text-sm text-blue-600 hover:text-blue-800 font-medium">Ver todas</Link>
+                        <Link
+                            to="/dashboard/admin/manage"
+                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                            Ver todas
+                        </Link>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
@@ -156,24 +167,37 @@ const AdminDashboardPage = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="4" className="p-4 text-center text-gray-400">Cargando datos...</td>
+                                        <td colSpan="4" className="p-4 text-center text-gray-400">
+                                            Cargando datos...
+                                        </td>
                                     </tr>
                                 ) : recentQuinielas.length === 0 ? (
                                     <tr>
-                                        <td colSpan="4" className="p-4 text-center text-gray-400">No hay quinielas creadas.</td>
+                                        <td colSpan="4" className="p-4 text-center text-gray-400">
+                                            No hay quinielas creadas.
+                                        </td>
                                     </tr>
                                 ) : (
                                     recentQuinielas.map(quiniela => {
-                                        // Lectura directa de Timestamp
                                         const deadline = quiniela.metadata?.deadline?.toDate();
                                         const isOpen = new Date() < deadline;
+
                                         return (
-                                            <tr key={quiniela.id} className="hover:bg-gray-50 transition-colors">
+                                            <tr
+                                                key={quiniela.id}
+                                                className="hover:bg-gray-50 transition-colors"
+                                            >
                                                 <td className="px-6 py-4 font-medium text-gray-900 truncate max-w-xs">
                                                     {quiniela.metadata?.title || "Sin título"}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    <span
+                                                        className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                                            isOpen
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                        }`}
+                                                    >
                                                         {isOpen ? 'ABIERTA' : 'CERRADA'}
                                                     </span>
                                                 </td>
@@ -211,38 +235,59 @@ const AdminDashboardPage = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-fit">
                         <h3 className="font-bold text-gray-800 mb-4">Acciones Rápidas</h3>
                         <div className="space-y-3">
-                            <Link to="/dashboard/admin/create" className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all group">
+                            <Link
+                                to="/dashboard/admin/create"
+                                className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all group"
+                            >
                                 <div className="flex items-center">
                                     <div className="bg-blue-100 text-blue-600 p-2 rounded-md mr-3 group-hover:bg-blue-200 transition-colors">
                                         <i className="fas fa-plus"></i>
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-gray-700 text-sm">Crear Quiniela</p>
-                                        <p className="text-xs text-gray-500">Configurar nuevos partidos</p>
+                                        <p className="font-semibold text-gray-700 text-sm">
+                                            Crear Quiniela
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Configurar nuevos partidos
+                                        </p>
                                     </div>
                                 </div>
                             </Link>
 
-                            <Link to="/dashboard/admin/manage" className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-purple-50 hover:border-purple-200 transition-all group">
+                            <Link
+                                to="/dashboard/admin/manage"
+                                className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-purple-50 hover:border-purple-200 transition-all group"
+                            >
                                 <div className="flex items-center">
                                     <div className="bg-purple-100 text-purple-600 p-2 rounded-md mr-3 group-hover:bg-purple-200 transition-colors">
                                         <i className="fas fa-edit"></i>
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-gray-700 text-sm">Ingresar Resultados</p>
-                                        <p className="text-xs text-gray-500">Cerrar marcadores y jornadas</p>
+                                        <p className="font-semibold text-gray-700 text-sm">
+                                            Ingresar Resultados
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Cerrar marcadores y jornadas
+                                        </p>
                                     </div>
                                 </div>
                             </Link>
 
-                            <Link to="/dashboard/admin/users" className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-orange-50 hover:border-orange-200 transition-all group">
+                            <Link
+                                to="/dashboard/admin/users"
+                                className="block w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-orange-50 hover:border-orange-200 transition-all group"
+                            >
                                 <div className="flex items-center">
                                     <div className="bg-orange-100 text-orange-600 p-2 rounded-md mr-3 group-hover:bg-orange-200 transition-colors">
                                         <i className="fas fa-users"></i>
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-gray-700 text-sm">Gestionar Usuarios</p>
-                                        <p className="text-xs text-gray-500">Revisar roles y bloqueos</p>
+                                        <p className="font-semibold text-gray-700 text-sm">
+                                            Gestionar Usuarios
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Revisar roles y bloqueos
+                                        </p>
                                     </div>
                                 </div>
                             </Link>

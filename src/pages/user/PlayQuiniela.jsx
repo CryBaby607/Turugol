@@ -37,10 +37,8 @@ const PlayQuiniela = () => {
                     const data = { id: docSnap.id, ...docSnap.data() };
                     setQuiniela(data);
 
-                    // --- CORRECCIÓN DE LECTURA DE FECHA ---
                     if (data.metadata?.deadline) {
                         const rawDeadline = data.metadata.deadline;
-                        // Si es Timestamp de Firestore usa .toDate(), si es string usa new Date()
                         const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
                         
                         if (new Date() > deadlineDate) {
@@ -98,7 +96,6 @@ const PlayQuiniela = () => {
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
         
-        // --- VALIDACIÓN DE FECHA AL ENVIAR ---
         if (quiniela?.metadata?.deadline) {
             const rawDeadline = quiniela.metadata.deadline;
             const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
@@ -125,13 +122,13 @@ const PlayQuiniela = () => {
                 quinielaId,
                 quinielaName: quiniela.metadata.title,
                 predictions,
-                totalCost,      
-                combinations,   
-                basePrice,      
+                totalCost,
+                combinations,
+                basePrice,
                 createdAt: serverTimestamp(),
                 status: 'active',
-                puntos: 0, 
-                paymentStatus: 'pending' 
+                puntos: 0,
+                paymentStatus: 'pending'
             });
             
             setShowPaymentBanner(true);
