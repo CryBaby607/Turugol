@@ -36,6 +36,20 @@ const Register = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+
+        if (name === 'phone') {
+            const numericValue = value.replace(/[^0-9]/g, '');
+            if (numericValue.length > 10) return;
+            setFormData(prev => ({ ...prev, [name]: numericValue }));
+            return;
+        }
+
+        const charLimits = {
+            firstName: 30, lastName: 30, username: 20, email: 50, password: 30, confirmPassword: 30
+        };
+
+        if (charLimits[name] && value.length > charLimits[name]) return;
+
         setFormData(prev => ({ ...prev, [name]: value }));
 
         if (name === 'password' || name === 'confirmPassword') {
@@ -44,7 +58,7 @@ const Register = () => {
 
             if (valPass && valConfirm) {
                 if (valPass === valConfirm) {
-                    setPasswordMatch({ isMatch: true, message: 'Las contraseñas coinciden', color: 'text-green-600' });
+                    setPasswordMatch({ isMatch: true, message: '¡Las contraseñas coinciden!', color: 'text-emerald-500' });
                 } else {
                     setPasswordMatch({ isMatch: false, message: 'Las contraseñas no coinciden', color: 'text-red-500' });
                 }
@@ -54,22 +68,17 @@ const Register = () => {
         }
     };
 
-    const handleFirebaseError = (error) => {
-        const map = {
-            "auth/email-already-in-use": "Este correo ya está registrado.",
-            "auth/invalid-email": "El correo no es válido.",
-            "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
-            "auth/operation-not-allowed": "El registro no está habilitado."
-        };
-        return map[error.code] || "Error al crear la cuenta. Intenta de nuevo.";
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
-
+        
         if (formData.password !== formData.confirmPassword) {
-            setServerError("Las contraseñas no coinciden.");
+            setServerError("Las contraseñas no coinciden");
+            return;
+        }
+
+        if (formData.phone.length !== 10) {
+            setServerError("El teléfono debe tener 10 dígitos");
             return;
         }
 
@@ -83,28 +92,36 @@ const Register = () => {
             );
             const user = userCredential.user;
 
-            const fullName = `${formData.firstName} ${formData.lastName}`.trim();
             await updateProfile(user, {
-                displayName: fullName || formData.username
+                displayName: `${formData.firstName} ${formData.lastName}`
             });
 
             await setDoc(doc(db, "users", user.uid), {
-                uid: user.uid,
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 username: formData.username,
-                email: formData.email,
                 phone: formData.phone,
+                email: formData.email,
                 role: 'user',
                 createdAt: new Date().toISOString(),
+                isBlocked: false
             });
 
             await sendEmailVerification(user);
-            setVerificationSent(true);
+            setVerificationSent(true); 
+
+            setTimeout(() => {
+                const from = location.state?.from?.pathname || "/dashboard/user";
+                navigate(from, { replace: true });
+            }, 3000); 
 
         } catch (error) {
-            console.error("Registration error:", error);
-            setServerError(handleFirebaseError(error));
+            console.error("Error en registro:", error);
+            let msg = "Error al registrarse. Intente nuevamente.";
+            if (error.code === 'auth/email-already-in-use') msg = "El correo ya está registrado.";
+            if (error.code === 'auth/weak-password') msg = "La contraseña es muy débil (mínimo 6 caracteres).";
+            if (error.code === 'auth/invalid-email') msg = "El correo electrónico no es válido.";
+            setServerError(msg);
         } finally {
             setIsLoading(false);
         }
@@ -112,22 +129,20 @@ const Register = () => {
 
     if (verificationSent) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+            <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
                 <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                    <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 text-center">
+                    <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 text-center border border-gray-200">
                         <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                            <i className="fas fa-check text-green-600"></i>
+                            <i className="fas fa-check text-green-600 text-xl"></i>
                         </div>
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">¡Cuenta creada!</h3>
-                        <p className="mt-2 text-sm text-gray-500">
-                            Hemos enviado un enlace de verificación a <b>{formData.email}</b>.
-                            Por favor revisa tu bandeja de entrada para activar tu cuenta.
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Cuenta creada con éxito!</h2>
+                        <p className="text-sm text-gray-600 mb-6">
+                            Hemos enviado un enlace de verificación a <strong>{formData.email}</strong>.
+                            Por favor revisa tu bandeja de entrada (y spam).
                         </p>
-                        <div className="mt-6">
-                            <Link to="/login" className="text-emerald-600 font-bold hover:text-emerald-500">
-                                Ir al Inicio de Sesión
-                            </Link>
-                        </div>
+                        <p className="text-xs text-gray-500 flex justify-center items-center gap-2">
+                            Redirigiendo al panel... <i className="fas fa-spinner fa-spin"></i>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -135,159 +150,186 @@ const Register = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="flex justify-center">
-                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform -rotate-3">
-                        <i className="fas fa-user-plus"></i>
-                    </div>
+                <div className="text-center mb-6">
+                    <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                        Crea tu cuenta en <span className="text-emerald-600">Turugol</span>
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Únete a la comunidad y demuestra tus conocimientos deportivos
+                    </p>
                 </div>
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Crea tu cuenta
-                </h2>
-                <p className="mt-2 text-center text-sm text-gray-600">
-                    Únete a la comunidad de <span className="font-bold text-emerald-600">Turugol</span>
-                </p>
-            </div>
 
-            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
-                    
-                    {serverError && (
-                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <i className="fas fa-exclamation-circle text-red-500"></i>
+                <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                    <div className="bg-white py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-gray-100">
+                        <form className="space-y-5" onSubmit={handleSubmit}>
+                            
+                            {serverError && (
+                                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-pulse">
+                                    <div className="flex">
+                                        <div className="flex-shrink-0">
+                                            <i className="fas fa-exclamation-circle text-red-500"></i>
+                                        </div>
+                                        <div className="ml-3">
+                                            <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="ml-3">
-                                    <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <i className="fas fa-user text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="firstName"
+                                        placeholder="Nombre"
+                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                        value={formData.firstName}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </div>
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <i className="fas fa-user text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="lastName"
+                                        placeholder="Apellido"
+                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                        value={formData.lastName}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
                                 </div>
                             </div>
-                        </div>
-                    )}
 
-                    <form className="space-y-5" onSubmit={handleSubmit}>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                                <input name="firstName" type="text" required value={formData.firstName} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="Juan" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Apellido</label>
-                                <input name="lastName" type="text" required value={formData.lastName} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="Pérez" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nombre de Usuario (Alias)</label>
-                            <input name="username" type="text" required value={formData.username} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="juanperez99" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Teléfono (WhatsApp)</label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-phone text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-at text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
-                                <input 
-                                    name="phone" 
-                                    type="tel" 
-                                    required 
-                                    value={formData.phone} 
-                                    onChange={handleInputChange} 
-                                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
-                                    placeholder="55 1234 5678" 
+                                <input
+                                    type="text"
+                                    name="username"
+                                    placeholder="Nombre de usuario (ej. campeon10)"
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                    value={formData.username}
+                                    onChange={handleInputChange}
+                                    required
                                 />
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-envelope text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-phone text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
-                                <input name="email" type="email" autoComplete="email" required value={formData.email} onChange={handleInputChange} className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" placeholder="tu@correo.com" />
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    placeholder="Teléfono (10 dígitos)"
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                    value={formData.phone}
+                                    onChange={handleInputChange}
+                                    required
+                                />
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-lock text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-envelope text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
-                                <input 
-                                    name="password" 
-                                    type={showPassword ? "text" : "password"} 
-                                    required 
-                                    value={formData.password} 
-                                    onChange={handleInputChange} 
-                                    className="block w-full pl-10 pr-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
-                                    placeholder="Mínimo 6 caracteres" 
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder="Correo electrónico"
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-lock text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                                </div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    placeholder="Contraseña"
+                                    className="w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                    value={formData.password}
+                                    onChange={handleInputChange}
+                                    required
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-emerald-600 cursor-pointer transition-colors focus:outline-none"
                                 >
                                     <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                                 </button>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Confirmar contraseña</label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-lock text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-lock text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
-                                <input 
-                                    name="confirmPassword" 
-                                    type={showPassword ? "text" : "password"} 
-                                    required 
-                                    value={formData.confirmPassword} 
-                                    onChange={handleInputChange} 
-                                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm" 
-                                    placeholder="Repite tu contraseña" 
+                                <input
+                                    type="password"
+                                    name="confirmPassword"
+                                    placeholder="Confirmar contraseña"
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                                    value={formData.confirmPassword}
+                                    onChange={handleInputChange}
+                                    required
                                 />
                             </div>
+
                             {passwordMatch.message && (
-                                <p className={`mt-1 text-xs ${passwordMatch.color}`}>
+                                <p className={`text-xs text-center font-bold ${passwordMatch.color} bg-gray-50 py-2 rounded-md`}>
                                     {passwordMatch.message}
                                 </p>
                             )}
-                        </div>
 
-                        <div className="pt-2">
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-200 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <i className="fas fa-spinner fa-spin mr-2"></i> Creando cuenta...
-                                    </>
-                                ) : (
-                                    'Registrarse'
-                                )}
-                            </button>
-                        </div>
-                        
-                        <div className="pt-4 border-t border-gray-100">
-                            <p className="text-center text-sm text-gray-600">
-                                ¿Ya tienes cuenta? 
-                                <Link 
-                                    to="/login" 
-                                    state={{ from: location.state?.from }}
-                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline"
+                            <div className="pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-200 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative"
                                 >
-                                    Inicia sesión aquí
-                                </Link>
-                            </p>
-                        </div>
-                    </form>
+                                    {isLoading ? (
+                                        <>
+                                            <span className="absolute left-4 inset-y-0 flex items-center">
+                                                <i className="fas fa-spinner fa-spin"></i>
+                                            </span>
+                                            Creando cuenta...
+                                        </>
+                                    ) : (
+                                        'Registrarse'
+                                    )}
+                                </button>
+                            </div>
+                            
+                            <div className="pt-4 border-t border-gray-100">
+                                <p className="text-center text-sm text-gray-600">
+                                    ¿Ya tienes cuenta? 
+                                    <Link 
+                                        to="/login" 
+                                        state={{ from: location.state?.from }}
+                                        className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline transition-colors"
+                                    >
+                                        Inicia sesión aquí
+                                    </Link>
+                                </p>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

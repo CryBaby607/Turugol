@@ -43,11 +43,6 @@ const ForgotPassword = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="flex justify-center">
-                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform rotate-3">
-                        <i className="fas fa-key"></i>
-                    </div>
-                </div>
                 <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
                     Recuperar Contraseña
                 </h2>

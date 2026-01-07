@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../firebase/config"; 
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase/config"; 
 
 const Login = () => {
     const navigate = useNavigate();
@@ -14,9 +13,8 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [serverError, setServerError] = useState("");
-    const [verificationSent, setVerificationSent] = useState(false);
 
-    const from = location.state?.from?.pathname;
+    const from = location.state?.from?.pathname || "/dashboard/user";
 
     const handleFirebaseError = (error) => {
         const map = {
@@ -35,96 +33,52 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            
-            let role = 'user';
-            if (userDocSnap.exists()) {
-                role = userDocSnap.data().role;
-            }
-
-            if (from) {
-                navigate(from, { replace: true });
-            } else {
-                if (role === 'admin') {
-                    navigate('/dashboard/admin', { replace: true });
-                } else {
-                    navigate('/dashboard/user', { replace: true });
-                }
-            }
-
+            await signInWithEmailAndPassword(auth, email, password);
+            navigate(from, { replace: true });
         } catch (error) {
-            console.error("Login error:", error);
+            console.error("Error login:", error);
             setServerError(handleFirebaseError(error));
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleResendVerification = async () => {
-        if (!auth.currentUser) return;
-        try {
-            await sendEmailVerification(auth.currentUser);
-            setVerificationSent(true);
-        } catch (error) {
-            console.error("Error reenviando verificación:", error);
-        }
-    };
-
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+            
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="flex justify-center">
-                    <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transform rotate-3">
-                        <i className="fas fa-futbol"></i>
-                    </div>
+                <div className="text-center mb-6">
+                    <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                        Bienvenido a <span className="text-emerald-600">Turugol</span>
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Inicia sesión para gestionar tus quinielas
+                    </p>
                 </div>
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Inicia Sesión
-                </h2>
-                <p className="mt-2 text-center text-sm text-gray-600">
-                    Bienvenido de vuelta a <span className="font-bold text-emerald-600">Turugol</span>
-                </p>
-            </div>
 
-            <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="bg-white py-8 px-4 shadow-xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
-                    
-                    {serverError && (
-                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <i className="fas fa-exclamation-circle text-red-500"></i>
-                                </div>
-                                <div className="ml-3">
-                                    <p className="text-sm text-red-700 font-medium">{serverError}</p>
-                                    {serverError.includes("verificar") && !verificationSent && (
-                                        <button 
-                                            onClick={handleResendVerification}
-                                            className="mt-2 text-xs font-bold text-red-600 hover:text-red-800 underline"
-                                        >
-                                            Reenviar correo de verificación
-                                        </button>
-                                    )}
-                                    {verificationSent && (
-                                        <p className="mt-2 text-xs text-green-600 font-bold">¡Correo enviado!</p>
-                                    )}
+                <div className="bg-white py-8 px-4 shadow-xl shadow-emerald-100/50 sm:rounded-2xl sm:px-10 border border-gray-100">
+                    <form className="space-y-6" onSubmit={handleLogin}>
+                        
+                        {serverError && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-pulse">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <i className="fas fa-exclamation-circle text-red-500"></i>
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-sm text-red-700 font-medium">{serverError}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    <form className="space-y-6" onSubmit={handleLogin}>
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-1">
+                            <label className="block text-sm font-medium text-gray-700 ml-1">
                                 Correo Electrónico
                             </label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-envelope text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-envelope text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
                                 <input
                                     id="email"
@@ -132,21 +86,21 @@ const Login = () => {
                                     type="email"
                                     autoComplete="email"
                                     required
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400 text-gray-900 sm:text-sm"
+                                    placeholder="tu@correo.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-colors"
-                                    placeholder="tu@correo.com"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-1">
+                            <label className="block text-sm font-medium text-gray-700 ml-1">
                                 Contraseña
                             </label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fas fa-lock text-gray-400"></i>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fas fa-lock text-gray-400 group-focus-within:text-emerald-500 transition-colors"></i>
                                 </div>
                                 <input
                                     id="password"
@@ -154,33 +108,30 @@ const Login = () => {
                                     type={showPassword ? "text" : "password"}
                                     autoComplete="current-password"
                                     required
+                                    className="w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400 text-gray-900 sm:text-sm"
+                                    placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-colors"
-                                    placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-emerald-600 cursor-pointer transition-colors focus:outline-none"
                                 >
                                     <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                                 </button>
                             </div>
-                        </div>
-
-                        <div className="flex items-center justify-end">
-                            <div className="text-sm">
+                            <div className="flex justify-end">
                                 <Link 
-                                    to="/forgot-password" 
-                                    className="font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
+                                    to="/forgot-password"
+                                    className="text-xs font-medium text-emerald-600 hover:text-emerald-500 hover:underline mt-1"
                                 >
                                     ¿Olvidaste tu contraseña?
                                 </Link>
                             </div>
                         </div>
 
-                        <div>
+                        <div className="pt-2">
                             <button
                                 type="submit"
                                 disabled={isLoading}
@@ -201,7 +152,7 @@ const Login = () => {
                                 <Link 
                                     to="/register" 
                                     state={{ from: location.state?.from }}
-                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline"
+                                    className="font-bold text-emerald-600 hover:text-emerald-500 ml-1 hover:underline transition-colors"
                                 >
                                     Crea una cuenta nueva
                                 </Link>
