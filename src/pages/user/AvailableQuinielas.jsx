@@ -13,9 +13,14 @@ const AvailableQuinielas = () => {
         const q = query(collection(db, "quinielas"), orderBy("metadata.createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const now = new Date();
+        
         const docs = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(q => new Date(q.metadata.deadline) > now);
+          .filter(q => {
+             // Lectura directa de Timestamp
+             return q.metadata.deadline?.toDate() > now;
+          });
+          
         setQuinielas(docs);
       } catch (error) {
         console.error("Error al cargar quinielas:", error);
@@ -26,19 +31,20 @@ const AvailableQuinielas = () => {
     fetchQuinielas();
   }, []);
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
     return new Intl.DateTimeFormat('es-MX', { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long', 
       hour: '2-digit', 
       minute: '2-digit' 
-    }).format(date);
+    }).format(timestamp.toDate());
   };
 
-  const getTimeRemaining = (deadline) => {
-    const total = Date.parse(deadline) - Date.parse(new Date());
+  const getTimeRemaining = (timestamp) => {
+    if (!timestamp) return '';
+    const total = timestamp.toDate() - new Date();
     const hours = Math.floor((total / (1000 * 60 * 60)));
     const days = Math.floor(hours / 24);
     if (days > 0) return `${days} días restantes`;
@@ -60,7 +66,8 @@ const AvailableQuinielas = () => {
       ) : quinielas.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {quinielas.map((q) => {
-            const isUrgent = (new Date(q.metadata.deadline) - new Date()) < (24 * 60 * 60 * 1000);
+            const deadlineDate = q.metadata.deadline?.toDate();
+            const isUrgent = (deadlineDate - new Date()) < (24 * 60 * 60 * 1000);
             return (
               <div key={q.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col border border-gray-100 group">
                 <div className="bg-emerald-600 p-4 relative overflow-hidden">

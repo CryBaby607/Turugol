@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, auth } from '../../firebase/config'; 
-import { doc, setDoc, getDoc, deleteDoc, collection } from 'firebase/firestore'; 
+// IMPORTANTE: Importamos Timestamp
+import { doc, setDoc, getDoc, deleteDoc, collection, Timestamp } from 'firebase/firestore'; 
 import { fetchFromApi } from '../../services/footballApi';
 
 import LeagueSelector from './create-quiniela/LeagueSelector';
@@ -35,22 +36,18 @@ const CreateQuiniela = () => {
     const user = auth.currentUser; 
     const currentAdminId = user ? user.uid : null; 
 
-    // --- ESTADOS DE LIGAS ---
     const [leagues, setLeagues] = useState(INITIAL_LEAGUES);
     const [isManagingLeagues, setIsManagingLeagues] = useState(false);
     const [apiLeaguesResults, setApiLeaguesResults] = useState([]);
     const [isSearchingLeagues, setIsSearchingLeagues] = useState(false);
     const [searchApiLeague, setSearchApiLeague] = useState('');
 
-    // --- ESTADOS DE CONFIGURACIÓN ---
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [deadline, setDeadline] = useState(''); 
     const [maxFixtures, setMaxFixtures] = useState(10);
-    // NUEVO: Costo de la quiniela (Default $100 MXN)
     const [cost, setCost] = useState(100);
     
-    // --- ESTADOS DE SELECCIÓN DE PARTIDOS ---
     const [selectedLeagueId, setSelectedLeagueId] = useState(null); 
     const [selectedRound, setSelectedRound] = useState(''); 
     
@@ -61,7 +58,6 @@ const CreateQuiniela = () => {
     const [searchTerm, setSearchTerm] = useState(''); 
     const [selectedFixtures, setSelectedFixtures] = useState([]); 
     
-    // --- ESTADOS DE INTERFAZ Y CARGA ---
     const [isLoading, setIsLoading] = useState(false);
     const [apiError, setApiError] = useState(null);
     const [isSaving, setIsSaving] = useState(false); 
@@ -72,25 +68,16 @@ const CreateQuiniela = () => {
 
     const getBorradorRef = (uid) => doc(db, QUINIELA_BORRADORES_COLLECTION, uid);
 
-    // --- LÓGICA DE BORRADOR (AUTOGUARDADO) ---
     const persistDraft = async (overrides = {}, silent = false) => {
         if (!currentAdminId || initialLoadRef.current || isSubmittingRef.current) return;
 
         const dataToSave = {
-            title, 
-            description, 
-            deadline, 
-            cost, // Guardamos el costo
-            selectedFixtures, 
-            selectedLeagueId, 
-            selectedRound,
-            leagues,
-            maxFixtures,
-            ...overrides
+            title, description, deadline, cost, 
+            selectedFixtures, selectedLeagueId, selectedRound,
+            leagues, maxFixtures, ...overrides
         };
 
         const saveAction = setDoc(getBorradorRef(currentAdminId), dataToSave);
-
         if (silent) {
             try { await saveAction; } catch (e) { setSaveError("Error al autoguardar"); }
         } else {
@@ -102,13 +89,11 @@ const CreateQuiniela = () => {
         }
     };
 
-    // --- AJUSTE AUTOMÁTICO DE FECHA LÍMITE ---
     const autoSetDeadline = useCallback((silent = false) => {
         if (selectedFixtures.length === 0) return;
         
         const dates = selectedFixtures.map(f => new Date(f.fixture.date).getTime());
         const minDate = new Date(Math.min(...dates));
-        // Sugerir 5 minutos antes del primer partido
         const suggestedDate = new Date(minDate.getTime() - (5 * 60 * 1000));
 
         const year = suggestedDate.getFullYear();
@@ -132,7 +117,6 @@ const CreateQuiniela = () => {
         autoSetDeadline(true);
     }, [selectedFixtures, autoSetDeadline]);
 
-    // --- CARGA DE LIGAS DESDE API ---
     const loadLeaguesFromApi = async () => {
         const CACHE_KEY = 'api_leagues_cache';
         const CACHE_TIME_KEY = 'api_leagues_cache_time';
@@ -184,7 +168,6 @@ const CreateQuiniela = () => {
         if (isManagingLeagues && apiLeaguesResults.length === 0) loadLeaguesFromApi(); 
     }, [isManagingLeagues]);
 
-    // --- CARGA INICIAL DE BORRADOR ---
     useEffect(() => {
         if (!currentAdminId) return; 
         const loadInitialDraft = async () => {
@@ -208,7 +191,6 @@ const CreateQuiniela = () => {
         loadInitialDraft();
     }, [currentAdminId]); 
 
-    // --- TIMER DE AUTOGUARDADO ---
     useEffect(() => {
         if (initialLoadRef.current || !currentAdminId || isSubmittingRef.current) return; 
         setIsSaving(true);
@@ -219,7 +201,6 @@ const CreateQuiniela = () => {
         return () => clearTimeout(timer); 
     }, [title, description, deadline, maxFixtures, cost]);
 
-    // --- CARGA DE JORNADAS (ROUNDS) ---
     useEffect(() => {
         const fetchRoundsForLeague = async () => {
             if (!selectedLeagueId || initialLoadRef.current) return;
@@ -235,7 +216,6 @@ const CreateQuiniela = () => {
         fetchRoundsForLeague();
     }, [selectedLeagueId]);
 
-    // --- CARGA DE PARTIDOS (FIXTURES) ---
     const fetchFixtures = useCallback(async (leagueId, roundName) => {
         if (!leagueId || !roundName || initialLoadRef.current) {
             setApiFixtures([]);
@@ -261,7 +241,6 @@ const CreateQuiniela = () => {
         if (selectedRound && selectedLeagueId) fetchFixtures(selectedLeagueId, selectedRound);
     }, [selectedLeagueId, selectedRound, fetchFixtures]);
 
-    // --- MANEJO DE INPUTS ---
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         if (name === 'title') setTitle(value);
@@ -312,24 +291,24 @@ const CreateQuiniela = () => {
         });
     };
 
-    // --- ENVÍO DEL FORMULARIO ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!currentAdminId) return;
         isSubmittingRef.current = true;
 
-        // --- FIX CRÍTICO: Conversión de Fecha ---
-        // Convertimos la fecha del input (String corto) a ISO String completo para Firebase
-        const safeDeadline = deadline ? new Date(deadline).toISOString() : null;
+        // ESTANDARIZACIÓN A TIMESTAMP
+        // 1. Deadline es Timestamp.fromDate()
+        const safeDeadline = deadline ? Timestamp.fromDate(new Date(deadline)) : null;
 
         const quinielaPayload = {
             metadata: { 
                 title, 
                 description, 
-                deadline: safeDeadline, // <--- Usamos la fecha corregida
+                deadline: safeDeadline, 
                 cost: Number(cost), 
                 createdBy: currentAdminId, 
-                createdAt: new Date().toISOString(), 
+                // 2. CreatedAt es Timestamp.now()
+                createdAt: Timestamp.now(), 
                 status: 'open', 
                 maxFixtures 
             },
@@ -351,7 +330,6 @@ const CreateQuiniela = () => {
             await setDoc(doc(collection(db, QUINIELAS_FINAL_COLLECTION)), quinielaPayload);
             await deleteDoc(getBorradorRef(currentAdminId));
             
-            // Reset form
             setTitle('');
             setDescription('');
             setSelectedFixtures([]);
@@ -386,11 +364,6 @@ const CreateQuiniela = () => {
                 <div>
                     <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
                         Crear Nueva Quiniela
-                        {isSaving && (
-                            <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full animate-pulse">
-                                Sincronizando...
-                            </span>
-                        )}
                     </h2>
                     <p className="text-gray-500 mt-1">
                         Configura el evento y selecciona los {maxFixtures} partidos [Temporada: {SEASON_YEAR}].

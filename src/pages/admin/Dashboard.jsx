@@ -54,12 +54,13 @@ const AdminDashboardPage = () => {
 
                 const now = new Date();
 
+                // Filtrado con .toDate()
                 const active = quinielasData.filter(q =>
-                    q.metadata?.deadline && new Date(q.metadata.deadline) > now
+                    q.metadata?.deadline?.toDate() > now
                 );
 
                 const deadlines = active
-                    .map(q => new Date(q.metadata.deadline))
+                    .map(q => q.metadata.deadline.toDate())
                     .sort((a, b) => a - b);
 
                 const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
@@ -163,7 +164,8 @@ const AdminDashboardPage = () => {
                                     </tr>
                                 ) : (
                                     recentQuinielas.map(quiniela => {
-                                        const deadline = quiniela.metadata?.deadline ? new Date(quiniela.metadata.deadline) : new Date();
+                                        // Lectura directa de Timestamp
+                                        const deadline = quiniela.metadata?.deadline?.toDate();
                                         const isOpen = new Date() < deadline;
                                         return (
                                             <tr key={quiniela.id} className="hover:bg-gray-50 transition-colors">

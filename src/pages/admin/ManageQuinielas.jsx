@@ -19,7 +19,10 @@ const ManageQuinielas = () => {
                     id: doc.id,
                     ...doc.data()
                 }));
-                setQuinielas(quinielasData.sort((a, b) => new Date(b.metadata.createdAt) - new Date(a.metadata.createdAt)));
+                // Sort con .toDate()
+                setQuinielas(quinielasData.sort((a, b) => 
+                    b.metadata.createdAt.toDate() - a.metadata.createdAt.toDate()
+                ));
             } catch (error) {
                 console.error("Error al cargar quinielas:", error);
             } finally {
@@ -30,8 +33,10 @@ const ManageQuinielas = () => {
     }, []);
 
     const now = new Date();
-    const activeQuinielas = quinielas.filter(q => new Date(q.metadata.deadline) > now);
-    const historyQuinielas = quinielas.filter(q => new Date(q.metadata.deadline) <= now);
+    
+    // Filtros directos con .toDate()
+    const activeQuinielas = quinielas.filter(q => q.metadata.deadline.toDate() > now);
+    const historyQuinielas = quinielas.filter(q => q.metadata.deadline.toDate() <= now);
     
     const allFilteredQuinielas = activeTab === 'active' ? activeQuinielas : historyQuinielas;
 
@@ -81,7 +86,8 @@ const ManageQuinielas = () => {
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                         {currentQuinielas.map((q) => {
-                            const isOpen = new Date() < new Date(q.metadata.deadline);
+                            const deadlineDate = q.metadata.deadline.toDate();
+                            const isOpen = new Date() < deadlineDate;
                             return (
                                 <div key={q.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative animate-in fade-in duration-300">
                                     <div className="p-5">
@@ -95,7 +101,7 @@ const ManageQuinielas = () => {
                                             {q.metadata.title}
                                         </h3>
                                         <p className="text-xs text-gray-500 mb-4">
-                                            Cierre: {new Date(q.metadata.deadline).toLocaleDateString()}
+                                            Cierre: {deadlineDate.toLocaleDateString()}
                                         </p>
                                         <Link 
                                             to={`/dashboard/admin/quinielas/${q.id}`} 

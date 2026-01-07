@@ -65,24 +65,27 @@ const UserDashboardPage = () => {
 
         partSnap.forEach(doc => {
           const data = doc.data();
-          const fechaReal = data.createdAt || data.submittedAt || new Date().toISOString();
+          // Asumiendo que createdAt es Timestamp
+          const fechaObj = data.createdAt?.toDate() || new Date(); 
           if (data.status !== 'finalized') activeCount++;
-          allEntries.push({ id: doc.id, ...data, displayDate: fechaReal });
+          allEntries.push({ id: doc.id, ...data, displayDate: fechaObj });
         });
 
-        allEntries.sort((a, b) => new Date(b.displayDate) - new Date(a.displayDate));
+        allEntries.sort((a, b) => b.displayDate - a.displayDate);
         const history = allEntries.slice(0, 3);
 
         const quinielasRef = collection(db, 'quinielas');
-        const nowStr = new Date().toISOString();
-        const qDeadline = query(quinielasRef, where('metadata.deadline', '>', nowStr), orderBy('metadata.deadline', 'asc'), limit(1));
+        const now = new Date();
+        // Query directa: Firestore compara Timestamp con Date JS automáticamente
+        const qDeadline = query(quinielasRef, where('metadata.deadline', '>', now), orderBy('metadata.deadline', 'asc'), limit(1));
         const deadlineSnap = await getDocs(qDeadline);
 
         let nextDate = null;
         let nextTitle = 'No hay quinielas';
         if (!deadlineSnap.empty) {
           const qData = deadlineSnap.docs[0].data();
-          nextDate = new Date(qData.metadata.deadline);
+          // Lectura directa
+          nextDate = qData.metadata.deadline?.toDate();
           nextTitle = qData.metadata.title;
         }
 
@@ -161,7 +164,7 @@ const UserDashboardPage = () => {
                         </div>
                         <div>
                           <p className="font-semibold text-gray-800">{item.quinielaName}</p>
-                          <p className="text-xs text-gray-500">{new Date(item.displayDate).toLocaleDateString()} • {item.status === 'finalized' ? 'Finalizado' : 'Pendiente'}</p>
+                          <p className="text-xs text-gray-500">{item.displayDate.toLocaleDateString()} • {item.status === 'finalized' ? 'Finalizado' : 'Pendiente'}</p>
                         </div>
                       </div>
                       <span className={`px-3 py-1 text-xs font-bold rounded-full ${item.status === 'finalized' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>

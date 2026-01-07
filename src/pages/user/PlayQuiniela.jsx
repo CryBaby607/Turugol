@@ -20,7 +20,6 @@ const PlayQuiniela = () => {
     const [showPaymentBanner, setShowPaymentBanner] = useState(false);
     const [isExpired, setIsExpired] = useState(false);
 
-    // Límites de combinaciones (Reglas de Negocio)
     const MAX_TRIPLES = 3;
     const MAX_DOUBLES = 4;
 
@@ -38,8 +37,12 @@ const PlayQuiniela = () => {
                     const data = { id: docSnap.id, ...docSnap.data() };
                     setQuiniela(data);
 
+                    // --- CORRECCIÓN DE LECTURA DE FECHA ---
                     if (data.metadata?.deadline) {
-                        const deadlineDate = new Date(data.metadata.deadline);
+                        const rawDeadline = data.metadata.deadline;
+                        // Si es Timestamp de Firestore usa .toDate(), si es string usa new Date()
+                        const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
+                        
                         if (new Date() > deadlineDate) {
                             setIsExpired(true);
                         }
@@ -67,37 +70,24 @@ const PlayQuiniela = () => {
 
     const handleSelect = (fixtureId, selection) => {
         if (alreadyPlayed || showPaymentBanner || isExpired) return;
-        
         setPredictions(prev => {
             const currentPicks = prev[fixtureId] || [];
-            // Si ya está seleccionado, lo quita (toggle). Si no, lo agrega.
             const newPicks = currentPicks.includes(selection)
                 ? currentPicks.filter(item => item !== selection)
                 : [...currentPicks, selection];
-
             return { ...prev, [fixtureId]: newPicks };
         });
     };
 
-    // --- CORRECCIÓN DE LÓGICA DE CÁLCULO ---
     const calculateStats = () => {
-        let doubles = 0;
-        let triples = 0;
-
-        // Contar dobles y triples según las selecciones del usuario
+        let doubles = 0, triples = 0;
         Object.values(predictions).forEach(p => {
             if (p.length === 2) doubles++;
             if (p.length === 3) triples++;
         });
 
-        // Fórmula matemática para combinaciones: 2^D * 3^T
         const combinations = (2 ** doubles) * (3 ** triples);
-
-        // Obtenemos el PRECIO BASE configurado por el Admin (default 100 si no existe)
-        // Nota: Ahora 'cost' se interpreta como "Costo por Quiniela Sencilla"
         const basePrice = quiniela?.metadata?.cost !== undefined ? Number(quiniela.metadata.cost) : 100;
-
-        // Costo Total = Combinaciones * Precio Base
         const totalCost = combinations * basePrice;
 
         return { doubles, triples, totalCost, combinations, basePrice };
@@ -108,8 +98,11 @@ const PlayQuiniela = () => {
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
         
+        // --- VALIDACIÓN DE FECHA AL ENVIAR ---
         if (quiniela?.metadata?.deadline) {
-            const deadlineDate = new Date(quiniela.metadata.deadline);
+            const rawDeadline = quiniela.metadata.deadline;
+            const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
+            
             if (new Date() > deadlineDate) {
                 setIsExpired(true);
                 return toast.error("¡Lo sentimos! El tiempo para participar ha terminado.");
@@ -119,17 +112,9 @@ const PlayQuiniela = () => {
         const totalFixtures = quiniela?.fixtures?.length || 0;
         const completeMatches = Object.values(predictions).filter(p => p.length > 0).length;
 
-        // Validación: Deben estar todos los partidos pronosticados (al menos 1 opción)
-        if (completeMatches < totalFixtures) {
-            return toast.warning("Debes completar todos los partidos.");
-        }
-
-        if (triples > MAX_TRIPLES) {
-            return toast.warning(`Límite de triples excedido (Máx: ${MAX_TRIPLES})`);
-        }
-        if (doubles > MAX_DOUBLES) {
-            return toast.warning(`Límite de dobles excedido (Máx: ${MAX_DOUBLES})`);
-        }
+        if (completeMatches < totalFixtures) return toast.warning("Debes completar todos los partidos.");
+        if (triples > MAX_TRIPLES) return toast.warning(`Límite de triples excedido (Máx: ${MAX_TRIPLES})`);
+        if (doubles > MAX_DOUBLES) return toast.warning(`Límite de dobles excedido (Máx: ${MAX_DOUBLES})`);
 
         setSubmitting(true);
         try {
@@ -140,9 +125,9 @@ const PlayQuiniela = () => {
                 quinielaId,
                 quinielaName: quiniela.metadata.title,
                 predictions,
-                totalCost,      // Guardamos el costo calculado final
-                combinations,   // Guardamos el número de combinaciones jugadas
-                basePrice,      // (Opcional) Guardar el precio base histórico
+                totalCost,      
+                combinations,   
+                basePrice,      
                 createdAt: serverTimestamp(),
                 status: 'active',
                 puntos: 0, 
@@ -225,7 +210,6 @@ const PlayQuiniela = () => {
                         </div>
                     )}
 
-                    {/* El resumen recibirá el costo total ya multiplicado */}
                     <QuinielaSummary 
                         totalCost={totalCost}
                         doubles={doubles}
@@ -235,7 +219,6 @@ const PlayQuiniela = () => {
                         onSubmit={handleSubmit}
                         submitting={submitting}
                         disabled={alreadyPlayed || isExpired}
-                        // Pasamos combinations por si QuinielaSummary quiere mostrarlo (ej: "8 quinielas")
                         combinations={combinations}
                     />
                 </div>
