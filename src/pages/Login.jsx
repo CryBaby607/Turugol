@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase/config"; 
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase/config";
 
 const Login = () => {
     const navigate = useNavigate();
@@ -9,12 +10,9 @@ const Login = () => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [serverError, setServerError] = useState("");
-
-    const from = location.state?.from?.pathname || "/dashboard/user";
 
     const handleFirebaseError = (error) => {
         const map = {
@@ -33,8 +31,24 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-            navigate(from, { replace: true });
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+
+            let destination = "/dashboard/user";
+
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                if (userData.role === 'admin') {
+                    destination = "/dashboard/admin";
+                }
+            }
+
+            const finalDestination = location.state?.from?.pathname || destination;
+            navigate(finalDestination, { replace: true });
+
         } catch (error) {
             console.error("Error login:", error);
             setServerError(handleFirebaseError(error));
@@ -45,7 +59,6 @@ const Login = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-gray-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-            
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="text-center mb-6">
                     <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -58,7 +71,6 @@ const Login = () => {
 
                 <div className="bg-white py-8 px-4 shadow-xl shadow-emerald-100/50 sm:rounded-2xl sm:px-10 border border-gray-100">
                     <form className="space-y-6" onSubmit={handleLogin}>
-                        
                         {serverError && (
                             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-pulse">
                                 <div className="flex">
