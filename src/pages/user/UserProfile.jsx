@@ -38,8 +38,8 @@ const UserProfile = () => {
 
                     setFormData(prev => ({ ...prev, ...initialData }));
                 } catch (error) {
-                    console.error("Error cargando perfil:", error);
-                    toast.error("Error al cargar tu información.");
+                    console.error(error);
+                    toast.error("Error al cargar datos del perfil");
                 } finally {
                     setLoading(false);
                 }
@@ -49,35 +49,49 @@ const UserProfile = () => {
     }, [user]);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+
+        if (name === 'phone') {
+            const numericValue = value.replace(/[^0-9]/g, '');
+
+            if (numericValue.length <= 10) {
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: numericValue
+                }));
+            }
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!user) return;
         setUpdating(true);
 
         try {
-            const userDocRef = doc(db, 'users', user.uid);
-            
             if (formData.displayName !== user.displayName) {
                 await updateProfile(user, { displayName: formData.displayName });
             }
 
+            const userDocRef = doc(db, 'users', user.uid);
             await updateDoc(userDocRef, {
                 phone: formData.phone,
-                updatedAt: new Date().toISOString()
+                displayName: formData.displayName
             });
 
             if (formData.newPassword) {
                 if (formData.newPassword !== formData.confirmNewPassword) {
-                    throw new Error("Las nuevas contraseñas no coinciden.");
+                    throw new Error("Las nuevas contraseñas no coinciden");
                 }
-                if (!formData.currentPassword) {
-                    throw new Error("Ingresa tu contraseña actual para confirmar el cambio.");
-                }
-
+                
                 const credential = EmailAuthProvider.credential(user.email, formData.currentPassword);
                 await reauthenticateWithCredential(user, credential);
+                
                 await updatePassword(user, formData.newPassword);
                 
                 setFormData(prev => ({
@@ -86,99 +100,88 @@ const UserProfile = () => {
                     newPassword: '',
                     confirmNewPassword: ''
                 }));
-                toast.success("¡Contraseña actualizada!");
             }
 
             toast.success("Perfil actualizado correctamente");
         } catch (error) {
             console.error(error);
-            const errorMsg = error.code === 'auth/wrong-password' 
-                ? 'La contraseña actual es incorrecta.' 
-                : error.message;
-            toast.error(errorMsg);
+            if (error.code === 'auth/wrong-password') {
+                toast.error("La contraseña actual es incorrecta");
+            } else {
+                toast.error(error.message || "Error al actualizar el perfil");
+            }
         } finally {
             setUpdating(false);
         }
     };
 
-    if (loading) return <div className="p-10 text-center animate-pulse">Cargando perfil...</div>;
+    if (loading) {
+        return <div className="p-8 text-center text-gray-500">Cargando perfil...</div>;
+    }
 
     return (
-        <div className="max-w-2xl mx-auto p-4 md:p-8">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">Mi Perfil</h2>
-            
+        <div className="max-w-2xl mx-auto py-8 px-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-3xl font-bold text-emerald-600 border-4 border-white shadow-md">
-                        {formData.displayName ? formData.displayName.charAt(0).toUpperCase() : <i className="fas fa-user"></i>}
+                <div className="flex items-center gap-4 mb-8 border-b border-gray-100 pb-6">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-2xl font-bold">
+                        {formData.displayName?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-gray-800">{formData.displayName || 'Usuario'}</h3>
-                        <p className="text-gray-500 text-sm">{user.email}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100">
-                            Jugador
-                        </span>
+                        <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
+                        <p className="text-gray-500 text-sm">Gestiona tu información personal</p>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-4">
-                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2">
-                            Información Personal
-                        </h4>
-                        
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre para mostrar</label>
-                            <div className="relative">
-                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                    <i className="fas fa-user"></i>
-                                </span>
-                                <input
-                                    type="text"
-                                    name="displayName"
-                                    value={formData.displayName}
-                                    onChange={handleChange}
-                                    className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-shadow"
-                                    placeholder="Tu Nombre"
-                                />
-                            </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
+                            <input
+                                type="text"
+                                name="displayName"
+                                value={formData.displayName}
+                                onChange={handleChange}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                                placeholder="Tu nombre"
+                            />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono (WhatsApp)</label>
-                            <div className="relative">
-                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                                    <i className="fas fa-phone"></i>
-                                </span>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-shadow"
-                                    placeholder="55 1234 5678"
-                                />
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">Este número se usará para contactarte en caso de ganar.</p>
-                        </div>
-                        
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
                             <input
                                 type="email"
                                 value={formData.email}
                                 disabled
-                                className="block w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 sm:text-sm cursor-not-allowed"
+                                className="block w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg sm:text-sm cursor-not-allowed"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-2 text-gray-400 select-none">
+                                    <i className="fas fa-phone-alt text-xs"></i>
+                                </span>
+                                <input
+                                    type="text" 
+                                    inputMode="numeric"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    placeholder="Ej: 5512345678"
+                                    className="block w-full pl-8 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                                />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1 text-right">
+                                {formData.phone.length}/10 dígitos
+                            </p>
                         </div>
                     </div>
 
-                    <div className="space-y-4 pt-4">
-                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2">
-                            Seguridad
-                        </h4>
+                    <div className="border-t border-gray-100 pt-6 mt-2">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Cambiar Contraseña</h3>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña</label>
                                 <input
@@ -187,39 +190,39 @@ const UserProfile = () => {
                                     value={formData.newPassword}
                                     onChange={handleChange}
                                     className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                                    placeholder="Dejar en blanco para no cambiar"
+                                    placeholder="Dejar en blanco para mantener la actual"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Nueva</label>
-                                <input
-                                    type="password"
-                                    name="confirmNewPassword"
-                                    value={formData.confirmNewPassword}
-                                    onChange={handleChange}
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                                    placeholder="Repite la contraseña"
-                                />
-                            </div>
-                        </div>
 
-                        {(formData.newPassword || formData.email !== user.email) && (
-                            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 animate-fade-in">
-                                <label className="block text-sm font-bold text-yellow-800 mb-1">
-                                    <i className="fas fa-lock mr-2"></i>Contraseña Actual
-                                </label>
-                                <p className="text-xs text-yellow-600 mb-2">Necesaria para guardar cambios sensibles.</p>
-                                <input
-                                    type="password"
-                                    name="currentPassword"
-                                    value={formData.currentPassword}
-                                    onChange={handleChange}
-                                    className="block w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
-                                    placeholder="Ingresa tu contraseña actual"
-                                    required={!!formData.newPassword}
-                                />
-                            </div>
-                        )}
+                            {formData.newPassword && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Nueva Contraseña</label>
+                                        <input
+                                            type="password"
+                                            name="confirmNewPassword"
+                                            value={formData.confirmNewPassword}
+                                            onChange={handleChange}
+                                            className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                                            placeholder="Repite la nueva contraseña"
+                                        />
+                                    </div>
+
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-2">
+                                        <p className="text-sm text-yellow-800 mb-2 font-medium">⚠️ Requerido para guardar cambios de contraseña</p>
+                                        <input
+                                            type="password"
+                                            name="currentPassword"
+                                            value={formData.currentPassword}
+                                            onChange={handleChange}
+                                            className="block w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
+                                            placeholder="Ingresa tu contraseña actual"
+                                            required={!!formData.newPassword}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     <div className="pt-4 flex justify-end">

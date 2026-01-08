@@ -15,6 +15,7 @@ const UserHistory = () => {
     const itemsPerPage = 6; 
 
     const [selectedParticipation, setSelectedParticipation] = useState(null);
+    const [selectedPayment, setSelectedPayment] = useState(null); // Nuevo estado para modal de pago
     const [selectedQuinielaDetails, setSelectedQuinielaDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -99,30 +100,29 @@ const UserHistory = () => {
         }
     };
 
+    const handleViewPayment = (e, participation) => {
+        e.stopPropagation();
+        setSelectedPayment(participation);
+    };
+
     const closeDetails = () => {
         setSelectedParticipation(null);
         setSelectedQuinielaDetails(null);
     };
 
-    // --- CORRECCIÓN AQUÍ: Soporte para Arrays (Dobles/Triples) ---
+    const closePayment = () => {
+        setSelectedPayment(null);
+    };
+
     const translatePick = (pick) => {
         if (!pick) return '-';
-        // Aseguramos que sea array para manejarlo igual
         const picks = Array.isArray(pick) ? pick : [pick];
-        
-        const dictionary = {
-            'HOME': 'Local',
-            'AWAY': 'Visita',
-            'DRAW': 'Empate'
-        };
-
-        // Traducimos cada opción y las unimos
+        const dictionary = { 'HOME': 'Local', 'AWAY': 'Visita', 'DRAW': 'Empate' };
         return picks.map(p => dictionary[p] || p).join(' / ');
     };
 
     const getResultColor = (userPick, officialOutcome) => {
         if (!officialOutcome) return 'bg-gray-100 text-gray-500 border-gray-200';
-        // Lógica corregida para detectar acierto dentro de array
         const isHit = Array.isArray(userPick)
             ? userPick.includes(officialOutcome)
             : userPick === officialOutcome;
@@ -198,6 +198,17 @@ const UserHistory = () => {
                                     </div>
 
                                     <div className="flex gap-2">
+                                        {/* Botón de Pago Separado - Wallet Icon */}
+                                        {part.paymentStatus !== 'paid' && (
+                                            <button
+                                                onClick={(e) => handleViewPayment(e, part)}
+                                                className="px-3 py-2 bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 rounded-xl text-sm font-bold shadow-sm transition-colors"
+                                                title="Información de Pago"
+                                            >
+                                                <i className="fas fa-wallet"></i>
+                                            </button>
+                                        )}
+
                                         <button
                                             onClick={() => navigate(`/dashboard/user/leaderboard/${part.quinielaId}`)}
                                             className="px-3 py-2 bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 rounded-xl text-sm font-bold shadow-sm"
@@ -250,6 +261,31 @@ const UserHistory = () => {
                 </>
             )}
 
+            {/* Modal de Pago Separado */}
+            {selectedPayment && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+                     <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl relative animate-in zoom-in duration-200">
+                         <button
+                            onClick={closePayment}
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors z-20"
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                        
+                        <div className="mt-2">
+                            <h3 className="text-2xl font-bold text-gray-800 mb-1">Realizar Pago</h3>
+                            <p className="text-gray-500 text-sm mb-6">Sigue las instrucciones para validar tu quiniela: <span className="font-semibold text-gray-700">{selectedPayment.quinielaName}</span></p>
+                            
+                            <PaymentBanner
+                                totalCost={selectedPayment.totalCost || 100}
+                                hideButton={true}
+                            />
+                        </div>
+                     </div>
+                </div>
+            )}
+
+            {/* Modal de Detalles (Sin Banner de Pago) */}
             {selectedParticipation && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-3xl max-w-4xl w-full p-4 md:p-8 shadow-2xl my-auto">
@@ -267,16 +303,6 @@ const UserHistory = () => {
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
-
-                        {selectedParticipation.paymentStatus !== 'paid' && (
-                            <div className="mb-8">
-                                <PaymentBanner
-                                    totalCost={selectedParticipation.totalCost || 100}
-                                    onNavigate={closeDetails}
-                                    hideButton={true}
-                                />
-                            </div>
-                        )}
 
                         {loadingDetails ? (
                             <div className="py-12 text-center text-gray-400">
@@ -298,11 +324,8 @@ const UserHistory = () => {
                                     {selectedQuinielaDetails.fixtures.map((fixture) => {
                                         const userPick = selectedParticipation.predictions[fixture.id];
                                         const officialOutcome = fixture.outcome;
-                                        
-                                        // Usamos getResultColor que ya soporta arrays
                                         const statusClass = getResultColor(userPick, officialOutcome);
                                         
-                                        // Verificamos acierto para el icono final
                                         const isHit = Array.isArray(userPick)
                                             ? userPick.includes(officialOutcome)
                                             : userPick === officialOutcome;
@@ -320,7 +343,6 @@ const UserHistory = () => {
                                                     </div>
                                                 </div>
                                                 <div className="col-span-3 flex flex-col items-center justify-center">
-                                                    {/* AQUÍ SE USA LA FUNCIÓN CORREGIDA */}
                                                     <span className="text-xs font-black uppercase text-gray-700 text-center">
                                                         {translatePick(userPick)}
                                                     </span>
