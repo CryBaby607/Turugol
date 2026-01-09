@@ -70,7 +70,7 @@ const AdminDashboardPage = () => {
                     nextDeadline
                 });
 
-                setRecentQuinielas(quinielasData.slice(0, 5));
+                setRecentQuinielas(quinielasData.slice(0, 7));
             } catch (error) {
                 console.error("Error cargando dashboard:", error);
             } finally {

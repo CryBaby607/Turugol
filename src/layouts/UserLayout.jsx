@@ -19,8 +19,8 @@ const UserLayout = () => {
 
     const handleLogout = async () => {
         try {
+            navigate("/login"); 
             await signOut(auth);
-            window.location.href = "/";
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
         }
