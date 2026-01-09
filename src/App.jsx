@@ -27,6 +27,7 @@ import ResultsManager from './pages/admin/quinielas/ResultsManager';
 import ParticipantsManager from './pages/admin/quinielas/ParticipantsManager';
 
 import ProtectedRoute from './components/ProtectedRoute';
+import QuinielaGuard from './components/QuinielaGuard';
 
 function App() {
     return (
@@ -36,18 +37,22 @@ function App() {
 
             <Routes>
 
-                {/* ====================== RUTAS PÚBLICAS ====================== */}
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
 
-                {/* ====================== RUTAS DE USUARIO ====================== */}
                 <Route element={<ProtectedRoute requiredRole="user" />}>
                     <Route element={<UserLayout />}>
                         <Route path="/dashboard/user" element={<UserDashboardPage />} />
                         <Route path="/dashboard/user/available-quinielas" element={<AvailableQuinielas />} />
-                        <Route path="/dashboard/user/play/:quinielaId" element={<PlayQuiniela />} />
+                        
+                        <Route path="/dashboard/user/play/:quinielaId" element={
+                            <QuinielaGuard>
+                                <PlayQuiniela />
+                            </QuinielaGuard>
+                        } />
+
                         <Route path="/dashboard/user/history" element={<UserHistory />} />
                         <Route path="/dashboard/user/profile" element={<UserProfile />} />
                         <Route path="/dashboard/user/leaderboard/:quinielaId" element={<Leaderboard />} />
@@ -55,7 +60,6 @@ function App() {
                     </Route>
                 </Route>
 
-                {/* ====================== RUTAS DE ADMIN ====================== */}
                 <Route element={<ProtectedRoute requiredRole="admin" />}>
                     <Route element={<AdminLayout />}>
                         <Route path="/dashboard/admin" element={<AdminDashboardPage />} />
@@ -70,7 +74,6 @@ function App() {
                     </Route>
                 </Route>
 
-                {/* ====================== CATCH ALL ====================== */}
                 <Route path="*" element={<Home />} />
 
             </Routes>

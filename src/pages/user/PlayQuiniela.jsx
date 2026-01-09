@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
-import { doc, getDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { quinielaService } from '../../services/quinielaService';
 import { toast } from 'sonner';
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 import FixtureList from './FixtureList';
@@ -32,9 +33,9 @@ const PlayQuiniela = () => {
         const fetchData = async () => {
             if (!quinielaId) return;
             try {
-                const docSnap = await getDoc(doc(db, 'quinielas', quinielaId));
-                if (docSnap.exists()) {
-                    const data = { id: docSnap.id, ...docSnap.data() };
+                const data = await quinielaService.getById(quinielaId);
+                
+                if (data) {
                     setQuiniela(data);
 
                     if (data.metadata?.deadline) {
@@ -45,6 +46,10 @@ const PlayQuiniela = () => {
                             setIsExpired(true);
                         }
                     }
+                } else {
+                    toast.error("Quiniela no encontrada");
+                    navigate("/dashboard/user");
+                    return;
                 }
                 
                 if (user) {
@@ -64,7 +69,7 @@ const PlayQuiniela = () => {
             }
         };
         fetchData();
-    }, [quinielaId, user]);
+    }, [quinielaId, user, navigate]);
 
     const handleSelect = (fixtureId, selection) => {
         if (alreadyPlayed || showPaymentBanner || isExpired) return;
@@ -115,7 +120,7 @@ const PlayQuiniela = () => {
 
         setSubmitting(true);
         try {
-            await addDoc(collection(db, 'userEntries'), {
+            await quinielaService.submitEntry({
                 userId: user.uid,
                 userName: user.displayName || 'Usuario',
                 email: user.email,
@@ -124,11 +129,7 @@ const PlayQuiniela = () => {
                 predictions,
                 totalCost,
                 combinations,
-                basePrice,
-                createdAt: serverTimestamp(),
-                status: 'active',
-                puntos: 0,
-                paymentStatus: 'pending'
+                basePrice
             });
             
             setShowPaymentBanner(true);

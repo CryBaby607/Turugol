@@ -1,30 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase/config';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { quinielaService } from '../../services/quinielaService';
 import { Link } from 'react-router-dom'; 
 
 const AvailableQuinielas = () => {
   const [quinielas, setQuiniela] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
   useEffect(() => {
     const fetchQuinielas = async () => {
       try {
-        const q = query(collection(db, "quinielas"), orderBy("metadata.createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const now = new Date();
-        
-        const docs = querySnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(q => {
-             // Uso directo de .toDate() asumiendo Timestamp
-             return q.metadata.deadline?.toDate() > now;
-          });
-          
+        const docs = await quinielaService.getActive();
         setQuiniela(docs);
       } catch (error) {
         console.error("Error al cargar quinielas:", error);
@@ -37,18 +25,19 @@ const AvailableQuinielas = () => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return new Intl.DateTimeFormat('es-MX', { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long', 
       hour: '2-digit', 
       minute: '2-digit' 
-    }).format(timestamp.toDate());
+    }).format(date);
   };
 
   const getTimeRemaining = (timestamp) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate();
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const total = date - new Date();
     const hours = Math.floor((total / (1000 * 60 * 60)));
     const days = Math.floor(hours / 24);
@@ -58,7 +47,6 @@ const AvailableQuinielas = () => {
     return "¡Cierra pronto!";
   };
 
-  // Lógica de Paginación
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentQuinielas = quinielas.slice(indexOfFirstItem, indexOfLastItem);
@@ -93,7 +81,7 @@ const AvailableQuinielas = () => {
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {currentQuinielas.map((q) => {
-                const deadlineDate = q.metadata.deadline.toDate();
+                const deadlineDate = q.metadata.deadline.toDate ? q.metadata.deadline.toDate() : new Date(q.metadata.deadline);
                 const isUrgent = (deadlineDate - new Date()) < (24 * 60 * 60 * 1000);
                 
                 return (
