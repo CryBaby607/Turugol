@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { validateEmail, validatePassword, validatePhone, validateName } from '../utils/validators';
 import { handleError } from '../utils/errorHandler';
@@ -10,33 +10,33 @@ import { handleError } from '../utils/errorHandler';
 const Register = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
-        fullName: '',
+        firstName: '',
+        lastName: '',
         email: '',
         password: '',
         confirmPassword: '',
-        phoneNumber: '',
-        agreeTerms: false
+        phoneNumber: ''
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
 
     const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: value
         }));
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
     };
 
     const validateForm = () => {
         const newErrors = {};
-        if (!validateName(formData.fullName)) newErrors.fullName = "Ingresa tu nombre completo";
+        if (!validateName(formData.firstName)) newErrors.firstName = "Ingresa tu nombre";
+        if (!validateName(formData.lastName)) newErrors.lastName = "Ingresa tu apellido";
         if (!validateEmail(formData.email)) newErrors.email = "Correo inválido";
         if (!validatePhone(formData.phoneNumber)) newErrors.phoneNumber = "Teléfono inválido (10 dígitos)";
         if (!validatePassword(formData.password)) newErrors.password = "Mínimo 6 caracteres";
         if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Las contraseñas no coinciden";
-        if (!formData.agreeTerms) newErrors.agreeTerms = "Debes aceptar los términos";
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -48,35 +48,48 @@ const Register = () => {
 
         setLoading(true);
         try {
-            // 1. Crear usuario en Auth
+            const usersRef = collection(db, "users");
+            const qPhone = query(usersRef, where("phoneNumber", "==", formData.phoneNumber));
+            const phoneSnapshot = await getDocs(qPhone);
+
+            if (!phoneSnapshot.empty) {
+                setErrors(prev => ({ ...prev, phoneNumber: "Este número ya está registrado." }));
+                setLoading(false);
+                return;
+            }
+
             const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
             const user = userCredential.user;
 
-            // 2. Actualizar perfil básico (displayName)
-            await updateProfile(user, { displayName: formData.fullName });
+            const fullName = `${formData.firstName} ${formData.lastName}`.trim();
 
-            // 3. Guardar datos en Firestore
+            await updateProfile(user, { displayName: fullName });
+
             await setDoc(doc(db, "users", user.uid), {
                 uid: user.uid,
-                fullName: formData.fullName,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                fullName: fullName,
                 email: formData.email,
                 phoneNumber: formData.phoneNumber,
-                role: 'user', // Rol por defecto
+                role: 'user',
                 createdAt: serverTimestamp(),
                 balance: 0,
                 status: 'active'
             });
 
-            // [ELIMINADO] Ya no enviamos el correo de verificación
-            // await sendEmailVerification(user);
-
             toast.success("¡Registro exitoso! Bienvenido a TuruGol.");
-            
-            // Redirigir directamente al dashboard
             navigate('/dashboard/user');
 
         } catch (error) {
-            handleError(error, "Error en el registro");
+            console.error("Error registro:", error);
+            
+            if (error.code === 'auth/email-already-in-use') {
+                setErrors(prev => ({ ...prev, email: "Este correo ya está registrado." }));
+                toast.error("El correo ya está en uso.");
+            } else {
+                handleError(error, "Error en el registro");
+            }
         } finally {
             setLoading(false);
         }
@@ -100,23 +113,38 @@ const Register = () => {
                 <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
                     <form className="space-y-6" onSubmit={handleRegister}>
                         
-                        {/* Nombre Completo */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nombre Completo</label>
-                            <div className="mt-1">
-                                <input
-                                    name="fullName"
-                                    type="text"
-                                    required
-                                    className={`appearance-none block w-full px-3 py-2 border ${errors.fullName ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm`}
-                                    value={formData.fullName}
-                                    onChange={handleChange}
-                                />
-                                {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
+                        <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                                <div className="mt-1">
+                                    <input
+                                        name="firstName"
+                                        type="text"
+                                        required
+                                        className={`appearance-none block w-full px-3 py-2 border ${errors.firstName ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm`}
+                                        value={formData.firstName}
+                                        onChange={handleChange}
+                                    />
+                                    {errors.firstName && <p className="mt-1 text-xs text-red-600">{errors.firstName}</p>}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Apellido</label>
+                                <div className="mt-1">
+                                    <input
+                                        name="lastName"
+                                        type="text"
+                                        required
+                                        className={`appearance-none block w-full px-3 py-2 border ${errors.lastName ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm`}
+                                        value={formData.lastName}
+                                        onChange={handleChange}
+                                    />
+                                    {errors.lastName && <p className="mt-1 text-xs text-red-600">{errors.lastName}</p>}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Email */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Correo Electrónico</label>
                             <div className="mt-1">
@@ -132,7 +160,6 @@ const Register = () => {
                             </div>
                         </div>
 
-                        {/* Teléfono */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Teléfono (WhatsApp)</label>
                             <div className="mt-1">
@@ -149,7 +176,6 @@ const Register = () => {
                             </div>
                         </div>
 
-                        {/* Contraseña */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Contraseña</label>
                             <div className="mt-1">
@@ -165,7 +191,6 @@ const Register = () => {
                             </div>
                         </div>
 
-                        {/* Confirmar Contraseña */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Confirmar Contraseña</label>
                             <div className="mt-1">
@@ -180,21 +205,6 @@ const Register = () => {
                                 {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
                             </div>
                         </div>
-
-                        <div className="flex items-center">
-                            <input
-                                id="agreeTerms"
-                                name="agreeTerms"
-                                type="checkbox"
-                                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                                checked={formData.agreeTerms}
-                                onChange={handleChange}
-                            />
-                            <label htmlFor="agreeTerms" className="ml-2 block text-sm text-gray-900">
-                                Acepto los <span className="text-emerald-600 cursor-pointer">Términos y Condiciones</span>
-                            </label>
-                        </div>
-                        {errors.agreeTerms && <p className="text-xs text-red-600 mt-0">{errors.agreeTerms}</p>}
 
                         <div>
                             <button
