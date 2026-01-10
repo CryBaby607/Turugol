@@ -1,9 +1,10 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStatusAndRole } from '../hooks/useAuthStatusAndRole';
 
 const ProtectedRoute = ({ adminOnly = false }) => {
     const { loggedIn, checkingStatus, isAdmin } = useAuthStatusAndRole();
+    const location = useLocation();
 
     if (checkingStatus) {
         return (
@@ -14,7 +15,7 @@ const ProtectedRoute = ({ adminOnly = false }) => {
     }
 
     if (!loggedIn) {
-        return <Navigate to="/login" />;
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
     if (adminOnly && !isAdmin) {
