@@ -13,17 +13,13 @@ const ProtectedRoute = ({ adminOnly = false }) => {
         );
     }
 
-    // 1. Si no está logueado -> Login
     if (!loggedIn) {
         return <Navigate to="/login" />;
     }
 
-    // 2. Si es ruta de admin y el usuario no es admin -> Dashboard User
     if (adminOnly && !isAdmin) {
         return <Navigate to="/dashboard/user" />;
     }
-
-    // [ELIMINADO] Ya no hay chequeo de emailVerified aquí tampoco
 
     return <Outlet />;
 };

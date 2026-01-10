@@ -12,11 +12,9 @@ export const useAuthStatusAndRole = () => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // [MODIFICADO] Ya no verificamos user.emailVerified
                 setLoggedIn(true);
 
                 try {
-                    // Obtener rol desde Firestore
                     const userRef = doc(db, 'users', user.uid);
                     const docSnap = await getDoc(userRef);
 
