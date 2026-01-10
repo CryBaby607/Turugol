@@ -5,8 +5,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { quinielaService } from '../../services/quinielaService';
 import { calculateQuinielaCost } from '../../services/pricingService';
 import { isExpired } from '../../utils/dateHelpers';
-import { handleError } from '../../utils/errorHandler'; // [!code ++] Importamos el handler
-import { toast } from 'sonner'; // Mantenemos toast para mensajes de éxito
+import { handleError } from '../../utils/errorHandler';
+import { toast } from 'sonner';
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 import FixtureList from './FixtureList';
 import QuinielaSummary from './QuinielaSummary';
@@ -59,8 +59,6 @@ const PlayQuiniela = () => {
                     if (!entrySnap.empty) setAlreadyPlayed(true);
                 }
             } catch (error) { 
-                // [!code warning] ANTES: console.error(error); toast.error(...)
-                // [!code success] AHORA: Delegamos al handler
                 handleError(error, "Error al cargar la quiniela");
             } finally { 
                 setLoading(false); 
@@ -121,7 +119,6 @@ const PlayQuiniela = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
         } catch (error) {
-            // [!code success] Uso del handler centralizado
             handleError(error, "No se pudo guardar tu quiniela");
         } finally {
             setSubmitting(false);
