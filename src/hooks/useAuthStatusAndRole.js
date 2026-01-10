@@ -1,46 +1,44 @@
 import { useState, useEffect } from 'react';
-import { auth, db } from '../firebase/config';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
 
-const useAuthStatusAndRole = () => {
-  const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [role, setRole] = useState(null);
-  const [loadingRole, setLoadingRole] = useState(true);
+export const useAuthStatusAndRole = () => {
+    const [loggedIn, setLoggedIn] = useState(false);
+    const [checkingStatus, setCheckingStatus] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [userData, setUserData] = useState(null);
 
-  useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
-      setRole(null);
-      setLoadingRole(true);
-      
-      setUser(currentUser);
-      setAuthReady(true);
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // [MODIFICADO] Ya no verificamos user.emailVerified
+                setLoggedIn(true);
 
-      if (currentUser) {
-        try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          const snap = await getDoc(userRef);
+                try {
+                    // Obtener rol desde Firestore
+                    const userRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(userRef);
 
-          if (snap.exists()) {
-            setRole(snap.data().role || 'user');
-          } else {
-            setRole('guest');
-          }
-        } catch (error) {
-          setRole('guest');
-        } finally {
-          setLoadingRole(false);
-        }
-      } else {
-        setRole('guest');
-        setLoadingRole(false);
-      }
-    });
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setUserData(data);
+                        setIsAdmin(data.role === 'admin');
+                    }
+                } catch (error) {
+                    console.error("Error obteniendo rol de usuario:", error);
+                }
 
-    return () => unsubscribeAuth();
-  }, []);
+            } else {
+                setLoggedIn(false);
+                setIsAdmin(false);
+                setUserData(null);
+            }
+            setCheckingStatus(false);
+        });
 
-  return { user, authReady, role, loadingRole };
+        return () => unsubscribe();
+    }, []);
+
+    return { loggedIn, checkingStatus, isAdmin, userData };
 };
-
-export default useAuthStatusAndRole;

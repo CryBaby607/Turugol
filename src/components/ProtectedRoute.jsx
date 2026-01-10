@@ -1,28 +1,31 @@
 import React from 'react';
-import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import useAuthStatusAndRole from '../hooks/useAuthStatusAndRole';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuthStatusAndRole } from '../hooks/useAuthStatusAndRole';
 
-const ProtectedRoute = ({ children, requiredRole }) => {
-    const { user, role, loadingRole } = useAuthStatusAndRole();
-    const location = useLocation();
+const ProtectedRoute = ({ adminOnly = false }) => {
+    const { loggedIn, checkingStatus, isAdmin } = useAuthStatusAndRole();
 
-    if (loadingRole) {
+    if (checkingStatus) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
             </div>
         );
     }
 
-    if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+    // 1. Si no está logueado -> Login
+    if (!loggedIn) {
+        return <Navigate to="/login" />;
     }
 
-    if (requiredRole === 'admin' && role !== 'admin') {
-        return <Navigate to="/dashboard/user" replace />;
+    // 2. Si es ruta de admin y el usuario no es admin -> Dashboard User
+    if (adminOnly && !isAdmin) {
+        return <Navigate to="/dashboard/user" />;
     }
 
-    return children ? children : <Outlet />;
+    // [ELIMINADO] Ya no hay chequeo de emailVerified aquí tampoco
+
+    return <Outlet />;
 };
 
 export default ProtectedRoute;
