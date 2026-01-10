@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { db } from '../../../firebase/config';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { db, auth } from '../../../firebase/config'; // [!code ++] Agregamos auth
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore'; // [!code ++] serverTimestamp
 import { fetchFromApi } from '../../../services/footballApi';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
@@ -27,6 +27,11 @@ const ResultsManager = () => {
                 if (docSnap.exists()) {
                     const data = { id: docSnap.id, ...docSnap.data() };
                     setQuiniela(data);
+
+                    // [!code ++] Advertencia visual si alguien más está procesando
+                    if (data.metadata?.isProcessing) {
+                        toast.warning(`⚠️ Esta quiniela está siendo procesada por: ${data.metadata.processingBy || 'Otro Admin'}`);
+                    }
 
                     const initialScores = {};
                     if (data.fixtures) {
@@ -55,12 +60,8 @@ const ResultsManager = () => {
         fetchQuiniela();
     }, [quinielaId, navigate]);
 
-    // Lógica para determinar el resultado (HOME, AWAY, DRAW)
     const determineOutcome = (homeScore, awayScore, fixtureStatus) => {
-        // Aceptamos estados de finalización, incluso si fueron a penales (PEN) o tiempo extra (AET)
-        // PERO el cálculo se hará con el marcador de los 90 min que le pasemos.
         const VALID_FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'Match Finished', 'Full Time'];
-        
         const statusStr = typeof fixtureStatus === 'object' ? fixtureStatus.short : fixtureStatus;
 
         if (!VALID_FINISHED_STATUSES.includes(statusStr)) return null;
@@ -98,22 +99,16 @@ const ResultsManager = () => {
                 
                 if (fixtureIndex !== -1) {
                     updatedFixturesLocal[fixtureIndex].status = match.fixture.status.short;
-                    
-                    // Limpieza de propiedades legacy
                     delete updatedFixturesLocal[fixtureIndex].isLocked;
                     delete updatedFixturesLocal[fixtureIndex].lockedAt;
                 }
 
                 const statusShort = match.fixture.status.short;
 
-                // Si el partido finalizó (FT, AET o PEN)
                 if (['FT', 'AET', 'PEN'].includes(statusShort)) {
                     let homeScore = match.goals.home;
                     let awayScore = match.goals.away;
 
-                    // --- REGLA DE LOS 90 MINUTOS ---
-                    // Si la API provee el desglose "score.fulltime", USAMOS ESE.
-                    // Esto descarta goles de tiempo extra o penales.
                     if (match.score && match.score.fulltime && match.score.fulltime.home !== null) {
                         homeScore = match.score.fulltime.home;
                         awayScore = match.score.fulltime.away;
@@ -127,7 +122,7 @@ const ResultsManager = () => {
             setEditingScores(newScores);
             setQuiniela({ ...quiniela, fixtures: updatedFixturesLocal });
 
-            toast.success(`Sincronización lista: ${updatesCount} partidos actualizados (Solo 90 min)`, {
+            toast.success(`Sincronización lista: ${updatesCount} partidos actualizados`, {
                 id: loadingToast
             });
         } catch (error) {
@@ -140,6 +135,16 @@ const ResultsManager = () => {
 
     const saveResultsAndCalculate = async () => {
         if (!quiniela) return;
+
+        // [!code ++] 1. Check de seguridad: Consultar estado fresco antes de intentar nada
+        const freshDocSnap = await getDoc(doc(db, 'quinielas', quiniela.id));
+        if (freshDocSnap.exists() && freshDocSnap.data().metadata?.isProcessing) {
+            return Swal.fire({
+                icon: 'error',
+                title: 'Bloqueado',
+                text: `Otro administrador (${freshDocSnap.data().metadata.processingBy}) está calculando puntos en este momento. Intenta en unos segundos.`
+            });
+        }
 
         const result = await Swal.fire({
             title: '¿Confirmas el cálculo de puntos?',
@@ -156,9 +161,16 @@ const ResultsManager = () => {
 
         setIsProcessing(true);
         const processingToast = toast.loading("Procesando puntos de usuarios...");
+        const quinielaRef = doc(db, 'quinielas', quiniela.id);
 
         try {
-            const quinielaRef = doc(db, 'quinielas', quiniela.id);
+            // [!code ++] 2. LOCK: Establecer bandera de procesamiento
+            await updateDoc(quinielaRef, {
+                'metadata.isProcessing': true,
+                'metadata.processingBy': auth.currentUser?.email || 'Admin',
+                'metadata.processingStartedAt': serverTimestamp()
+            });
+
             const officialOutcomes = {};
 
             // 1. Guardar resultados oficiales en la Quiniela
@@ -189,6 +201,7 @@ const ResultsManager = () => {
                 return updatedFixture;
             });
 
+            // Actualizamos fixtures pero MANTENEMOS el lock (no lo quitamos aquí)
             await updateDoc(quinielaRef, { fixtures: updatedFixtures });
 
             // 2. Calcular puntos de los usuarios
@@ -196,9 +209,8 @@ const ResultsManager = () => {
             const participationsSnapshot = await getDocs(q);
 
             if (participationsSnapshot.empty) {
-                toast.info("Resultados guardados (Sin participantes para calcular).", { id: processingToast });
-                setIsProcessing(false);
-                return;
+                toast.info("Resultados guardados (Sin participantes).", { id: processingToast });
+                return; // Irá al finally para desbloquear
             }
 
             const BATCH_SIZE = 400;
@@ -249,6 +261,17 @@ const ResultsManager = () => {
             console.error("Error cálculo:", error);
             toast.error("Error al procesar resultados", { id: processingToast });
         } finally {
+            // [!code ++] 3. UNLOCK: Siempre liberar el recurso al terminar (éxito o error)
+            try {
+                await updateDoc(quinielaRef, {
+                    'metadata.isProcessing': false,
+                    'metadata.lastProcessedAt': serverTimestamp(),
+                    'metadata.processingBy': null
+                });
+            } catch (unlockError) {
+                console.error("Error al desbloquear quiniela:", unlockError);
+            }
+            
             setIsProcessing(false);
         }
     };
@@ -269,16 +292,19 @@ const ResultsManager = () => {
                     </Link>
                     <h2 className="text-2xl font-bold text-gray-800">Resultados & Cálculo</h2>
                     <p className="text-sm text-gray-500">{quiniela?.metadata?.title}</p>
-                    <p className="text-xs text-blue-600 mt-1 font-medium bg-blue-50 inline-block px-2 py-1 rounded">
-                        <i className="fas fa-stopwatch mr-1"></i>
-                        Regla: Solo cuentan los 90 mins (Tiempo Regular).
-                    </p>
+                    {/* [!code ++] Indicador visual si está bloqueado */}
+                    {quiniela?.metadata?.isProcessing && (
+                        <p className="text-xs text-orange-600 mt-1 font-bold bg-orange-50 inline-block px-2 py-1 rounded animate-pulse">
+                            <i className="fas fa-cog fa-spin mr-1"></i>
+                            Procesando actualmente...
+                        </p>
+                    )}
                 </div>
 
                 <div className="flex gap-2">
                     <button
                         onClick={syncWithApi}
-                        disabled={isSyncing || isProcessing}
+                        disabled={isSyncing || isProcessing || quiniela?.metadata?.isProcessing}
                         className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-2 shadow-sm"
                     >
                         {isSyncing ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-cloud-download-alt"></i>}
@@ -286,7 +312,7 @@ const ResultsManager = () => {
                     </button>
                     <button
                         onClick={saveResultsAndCalculate}
-                        disabled={isProcessing}
+                        disabled={isProcessing || quiniela?.metadata?.isProcessing}
                         className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-50 transition-all"
                     >
                         {isProcessing ? 'Procesando...' : 'Guardar y Calcular'}

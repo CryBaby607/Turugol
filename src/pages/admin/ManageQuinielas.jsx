@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { quinielaService } from '../../services/quinielaService';
+import { isExpired, formatDisplayDate } from '../../utils/dateHelpers'; // [!code ++]
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
@@ -9,6 +10,7 @@ const ManageQuinielas = () => {
     const [quinielas, setQuinielas] = useState([]);
     const [loading, setLoading] = useState(true);
     
+    // Configuración de Paginación y Filtros
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 9;
     const [filter, setFilter] = useState('active');
@@ -56,10 +58,10 @@ const ManageQuinielas = () => {
         }
     };
 
-    const now = new Date();
+    // [!code success] Lógica de filtrado unificada con utils
     const filteredQuinielas = quinielas.filter(q => {
-        const deadline = q.metadata.deadline?.toDate ? q.metadata.deadline.toDate() : new Date(q.metadata.deadline);
-        return filter === 'active' ? deadline > now : deadline <= now;
+        const expired = isExpired(q.metadata.deadline);
+        return filter === 'active' ? !expired : expired;
     });
 
     const indexOfLastItem = currentPage * itemsPerPage;
@@ -69,10 +71,12 @@ const ManageQuinielas = () => {
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            {/* Encabezado limpio sin botones */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Administrar Quinielas</h1>
             </div>
 
+            {/* Pestañas de Filtro */}
             <div className="flex gap-4 mb-6 border-b border-gray-200">
                 <button onClick={() => { setFilter('active'); setCurrentPage(1); }} className={`pb-2 px-4 font-medium transition-colors ${filter === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
                     En Juego
@@ -121,7 +125,7 @@ const ManageQuinielas = () => {
                                     
                                     <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
                                         <i className="far fa-calendar-alt"></i>
-                                        {quiniela.metadata.deadline?.toDate ? quiniela.metadata.deadline.toDate().toLocaleDateString() : 'N/A'}
+                                        {formatDisplayDate(quiniela.metadata.deadline)}
                                     </p>
                                     
                                     <div className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-3 rounded-lg group-hover:bg-emerald-50/30 transition-colors">
@@ -144,6 +148,7 @@ const ManageQuinielas = () => {
                         ))}
                     </div>
 
+                    {/* Paginación */}
                     {totalPages > 1 && (
                         <div className="flex justify-center items-center gap-4 pb-8">
                             <button 

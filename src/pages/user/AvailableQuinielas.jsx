@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { quinielaService } from '../../services/quinielaService';
+import { parseFirebaseDate, formatDisplayDate, getTimeRemaining } from '../../utils/dateHelpers'; // [!code ++]
 import { Link } from 'react-router-dom'; 
 
 const AvailableQuinielas = () => {
@@ -22,30 +23,6 @@ const AvailableQuinielas = () => {
     };
     fetchQuinielas();
   }, []);
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return new Intl.DateTimeFormat('es-MX', { 
-      weekday: 'long', 
-      day: 'numeric', 
-      month: 'long', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    }).format(date);
-  };
-
-  const getTimeRemaining = (timestamp) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const total = date - new Date();
-    const hours = Math.floor((total / (1000 * 60 * 60)));
-    const days = Math.floor(hours / 24);
-    
-    if (days > 0) return `${days} días restantes`;
-    if (hours > 0) return `${hours} horas restantes`;
-    return "¡Cierra pronto!";
-  };
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -81,7 +58,8 @@ const AvailableQuinielas = () => {
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {currentQuinielas.map((q) => {
-                const deadlineDate = q.metadata.deadline.toDate ? q.metadata.deadline.toDate() : new Date(q.metadata.deadline);
+                // [!code success] Uso de helpers centralizados
+                const deadlineDate = parseFirebaseDate(q.metadata.deadline);
                 const isUrgent = (deadlineDate - new Date()) < (24 * 60 * 60 * 1000);
                 
                 return (
@@ -99,7 +77,7 @@ const AvailableQuinielas = () => {
                         <i className={`fas fa-clock mr-2 ${isUrgent ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}></i>
                         <div>
                             <p className="font-semibold">Cierre de apuestas:</p>
-                            <p className="text-xs">{formatDate(q.metadata.deadline)}</p>
+                            <p className="text-xs">{formatDisplayDate(q.metadata.deadline)}</p>
                             {isUrgent && <p className="text-xs text-red-500 font-bold mt-1">{getTimeRemaining(q.metadata.deadline)}</p>}
                         </div>
                         </div>

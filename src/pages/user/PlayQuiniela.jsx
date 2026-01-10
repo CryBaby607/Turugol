@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { quinielaService } from '../../services/quinielaService';
+import { isExpired } from '../../utils/dateHelpers'; // [!code ++]
 import { toast } from 'sonner';
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 import FixtureList from './FixtureList';
@@ -19,7 +20,7 @@ const PlayQuiniela = () => {
     const [predictions, setPredictions] = useState({});
     const [alreadyPlayed, setAlreadyPlayed] = useState(false);
     const [showPaymentBanner, setShowPaymentBanner] = useState(false);
-    const [isExpired, setIsExpired] = useState(false);
+    const [expiredStatus, setExpiredStatus] = useState(false);
 
     const MAX_TRIPLES = 3;
     const MAX_DOUBLES = 4;
@@ -37,14 +38,10 @@ const PlayQuiniela = () => {
                 
                 if (data) {
                     setQuiniela(data);
-
-                    if (data.metadata?.deadline) {
-                        const rawDeadline = data.metadata.deadline;
-                        const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
-                        
-                        if (new Date() > deadlineDate) {
-                            setIsExpired(true);
-                        }
+                    
+                    // [!code success] Validación centralizada
+                    if (isExpired(data.metadata?.deadline)) {
+                        setExpiredStatus(true);
                     }
                 } else {
                     toast.error("Quiniela no encontrada");
@@ -72,7 +69,7 @@ const PlayQuiniela = () => {
     }, [quinielaId, user, navigate]);
 
     const handleSelect = (fixtureId, selection) => {
-        if (alreadyPlayed || showPaymentBanner || isExpired) return;
+        if (alreadyPlayed || showPaymentBanner || expiredStatus) return;
         setPredictions(prev => {
             const currentPicks = prev[fixtureId] || [];
             const newPicks = currentPicks.includes(selection)
@@ -101,14 +98,10 @@ const PlayQuiniela = () => {
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
         
-        if (quiniela?.metadata?.deadline) {
-            const rawDeadline = quiniela.metadata.deadline;
-            const deadlineDate = rawDeadline.toDate ? rawDeadline.toDate() : new Date(rawDeadline);
-            
-            if (new Date() > deadlineDate) {
-                setIsExpired(true);
-                return toast.error("¡Lo sentimos! El tiempo para participar ha terminado.");
-            }
+        // [!code success] Doble check de seguridad usando la utilidad
+        if (isExpired(quiniela?.metadata?.deadline)) {
+            setExpiredStatus(true);
+            return toast.error("¡Lo sentimos! El tiempo para participar ha terminado.");
         }
 
         const totalFixtures = quiniela?.fixtures?.length || 0;
@@ -171,7 +164,7 @@ const PlayQuiniela = () => {
                             <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">
                                 {quiniela?.metadata?.title}
                             </h1>
-                            {isExpired ? (
+                            {expiredStatus ? (
                                 <p className="text-red-600 text-xs mt-1 font-bold bg-red-50 px-2 py-1 rounded inline-block">
                                     <i className="fas fa-lock mr-1"></i> CERRADA
                                 </p>
@@ -189,12 +182,12 @@ const PlayQuiniela = () => {
                         fixtures={quiniela?.fixtures} 
                         predictions={predictions} 
                         onSelect={handleSelect}
-                        disabled={alreadyPlayed || isExpired}
+                        disabled={alreadyPlayed || expiredStatus}
                     />
                 </div>
 
                 <div className="lg:w-1/3 w-full space-y-6">
-                    {isExpired && !showPaymentBanner && (
+                    {expiredStatus && !showPaymentBanner && (
                         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm animate-pulse">
                             <div className="flex">
                                 <div className="flex-shrink-0">
@@ -216,7 +209,7 @@ const PlayQuiniela = () => {
                         maxTriples={MAX_TRIPLES}
                         onSubmit={handleSubmit}
                         submitting={submitting}
-                        disabled={alreadyPlayed || isExpired}
+                        disabled={alreadyPlayed || expiredStatus}
                         combinations={combinations}
                     />
                 </div>

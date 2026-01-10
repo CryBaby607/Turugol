@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, auth } from '../../firebase/config'; 
 import { doc, setDoc, getDoc, deleteDoc, collection, Timestamp } from 'firebase/firestore'; 
 import { fetchFromApi } from '../../services/footballApi';
+import { sanitizeInput } from '../../utils/validators'; // [!code ++] Importamos el validador
 
 import LeagueSelector from './create-quiniela/LeagueSelector';
 import FixturePicker from './create-quiniela/FixturePicker';
@@ -21,6 +22,7 @@ const SEASON_YEAR = currentMonth < 6
     : currentDate.getFullYear();
 
 const MAX_DESCRIPTION_CHARS = 200;
+const MAX_TITLE_CHARS = 50; // [!code ++] Definimos límite para título
 
 const INITIAL_LEAGUES = [
     { id: 2, name: 'UEFA Champions League', nameShort: 'CHAMPIONS', logo: 'https://media.api-sports.io/football/leagues/2.png' },
@@ -242,8 +244,15 @@ const CreateQuiniela = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        if (name === 'title') setTitle(value);
-        if (name === 'description' && value.length <= MAX_DESCRIPTION_CHARS) setDescription(value);
+        
+        // [!code success] Aplicamos sanitización en tiempo real o permitimos caracteres seguros
+        if (name === 'title') {
+            setTitle(sanitizeInput(value, MAX_TITLE_CHARS));
+        }
+        if (name === 'description') {
+            setDescription(sanitizeInput(value, MAX_DESCRIPTION_CHARS));
+        }
+        
         if (name === 'deadline') setDeadline(value);
         if (name === 'maxFixtures') setMaxFixtures(Number(value));
         if (name === 'cost') setCost(Number(value)); 
@@ -297,10 +306,14 @@ const CreateQuiniela = () => {
 
         const safeDeadline = deadline ? Timestamp.fromDate(new Date(deadline)) : null;
 
+        // [!code success] Sanitización final antes de enviar (Trim)
+        const finalTitle = sanitizeInput(title, MAX_TITLE_CHARS).trim();
+        const finalDescription = sanitizeInput(description, MAX_DESCRIPTION_CHARS).trim();
+
         const quinielaPayload = {
             metadata: { 
-                title, 
-                description, 
+                title: finalTitle, 
+                description: finalDescription, 
                 deadline: safeDeadline, 
                 cost: Number(cost), 
                 createdBy: currentAdminId, 
