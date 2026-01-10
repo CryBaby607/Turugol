@@ -1,37 +1,23 @@
-/**
- * Convierte cualquier formato de fecha (Firestore Timestamp, string, Date) 
- * a un objeto Date nativo de JS válido.
- */
 export const parseFirebaseDate = (timestamp) => {
     if (!timestamp) return null;
 
-    // Caso 1: Es un Timestamp de Firestore (tiene método toDate)
     if (timestamp.toDate && typeof timestamp.toDate === 'function') {
         return timestamp.toDate();
     }
 
-    // Caso 2: Ya es un objeto Date
     if (timestamp instanceof Date) {
         return timestamp;
     }
 
-    // Caso 3: Es un string (ISO) o número (ms)
     return new Date(timestamp);
 };
 
-/**
- * Verifica si una fecha límite ya pasó.
- * Retorna true si ha expirado, false si sigue vigente.
- */
 export const isExpired = (deadline) => {
     const date = parseFirebaseDate(deadline);
     if (!date) return false; 
     return new Date() > date;
 };
 
-/**
- * Formatea una fecha para mostrar al usuario (Ej: "lunes, 15 de enero, 14:00")
- */
 export const formatDisplayDate = (timestamp) => {
     const date = parseFirebaseDate(timestamp);
     if (!date) return '';
@@ -45,9 +31,6 @@ export const formatDisplayDate = (timestamp) => {
     }).format(date);
 };
 
-/**
- * Calcula tiempo restante simple
- */
 export const getTimeRemaining = (timestamp) => {
     const date = parseFirebaseDate(timestamp);
     if (!date) return '';
@@ -62,14 +45,9 @@ export const getTimeRemaining = (timestamp) => {
     return "¡Cierra pronto!";
 };
 
-/**
- * Calcula la temporada de fútbol actual basándose en el mes.
- * Si estamos en la primera mitad del año (Ene-Jun), la temporada es la del año anterior.
- * Ej: Enero 2026 -> Temporada 2025 (2025-2026)
- */
 export const getCurrentFootballSeason = () => {
     const now = new Date();
-    const month = now.getMonth(); // 0 = Enero, 11 = Diciembre
+    const month = now.getMonth();
     const year = now.getFullYear();
 
     if (month < 6) { 

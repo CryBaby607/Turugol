@@ -1,8 +1,3 @@
-/**
- * Analiza las predicciones para contar dobles y triples.
- * @param {Object} predictions - Objeto con los picks del usuario { fixtureId: ['HOME', 'DRAW'] }
- * @returns {Object} { doubles, triples }
- */
 const analyzePredictions = (predictions) => {
     let doubles = 0;
     let triples = 0;
@@ -19,16 +14,9 @@ const analyzePredictions = (predictions) => {
     return { doubles, triples };
 };
 
-/**
- * Calcula el costo total de la quiniela basado en las combinaciones.
- * @param {Object} predictions - Objeto de predicciones.
- * @param {number} basePrice - Precio base por quiniela sencilla.
- * @returns {Object} Estadísticas completas y costo.
- */
 export const calculateQuinielaCost = (predictions, basePrice = 100) => {
     const { doubles, triples } = analyzePredictions(predictions);
     
-    // Fórmula: 2^dobles * 3^triples
     const combinations = (2 ** doubles) * (3 ** triples);
     const totalCost = combinations * basePrice;
 
