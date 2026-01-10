@@ -1,6 +1,9 @@
 import React from 'react';
 
 const QuinielaConfig = ({ data, updateData, onNext }) => {
+    // Protección contra undefined
+    const safeData = data || {};
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         updateData({ [name]: value });
@@ -16,21 +19,10 @@ const QuinielaConfig = ({ data, updateData, onNext }) => {
                     <input
                         type="text"
                         name="title"
-                        value={data.title}
+                        value={safeData.title || ''}
                         onChange={handleChange}
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                         placeholder="Ej: Quiniela Jornada 10"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Fecha y Hora Límite</label>
-                    <input
-                        type="datetime-local"
-                        name="deadline"
-                        value={data.deadline}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                 </div>
 
@@ -39,19 +31,7 @@ const QuinielaConfig = ({ data, updateData, onNext }) => {
                     <input
                         type="number"
                         name="entryFee"
-                        value={data.entryFee}
-                        onChange={handleChange}
-                        min="0"
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Premio Acumulado Inicial ($)</label>
-                    <input
-                        type="number"
-                        name="pot"
-                        value={data.pot}
+                        value={safeData.entryFee || 0}
                         onChange={handleChange}
                         min="0"
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -62,7 +42,7 @@ const QuinielaConfig = ({ data, updateData, onNext }) => {
                     <label className="text-sm font-bold text-gray-700">Descripción (Opcional)</label>
                     <textarea
                         name="description"
-                        value={data.description}
+                        value={safeData.description || ''}
                         onChange={handleChange}
                         rows="3"
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"

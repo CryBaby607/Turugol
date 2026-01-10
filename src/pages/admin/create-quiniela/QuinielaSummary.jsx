@@ -12,28 +12,30 @@ const QuinielaSummary = ({ data, onSubmit, onPrev, loading }) => {
                         <span className="font-bold text-gray-800 text-lg">{data.title}</span>
                     </div>
                     <div>
-                        <span className="block text-xs text-gray-500 uppercase font-bold">Deadline</span>
+                        <span className="block text-xs text-gray-500 uppercase font-bold">Deadline (Inicio 1er juego)</span>
                         <span className="font-bold text-gray-800">
-                            {data.deadline ? new Date(data.deadline).toLocaleString() : '-'}
+                            {data.deadline ? new Date(data.deadline).toLocaleString() : 'Automático'}
                         </span>
                     </div>
                     <div>
                         <span className="block text-xs text-gray-500 uppercase font-bold">Entrada</span>
                         <span className="font-bold text-emerald-600">${data.entryFee}</span>
                     </div>
-                    <div>
-                        <span className="block text-xs text-gray-500 uppercase font-bold">Pozo Inicial</span>
-                        <span className="font-bold text-emerald-600">${data.pot}</span>
-                    </div>
+                    {/* Se eliminó Pozo Inicial */}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4">
                     <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase">Partidos Seleccionados ({data.fixtures.length})</h3>
                     <ul className="space-y-2 max-h-48 overflow-y-auto">
                         {data.fixtures.map((f, i) => (
-                            <li key={i} className="text-sm bg-white p-2 rounded border border-gray-100 flex justify-between">
-                                <span className="text-gray-600">{f.teams.home.name} vs {f.teams.away.name}</span>
-                                <span className="text-xs text-gray-400 self-center">{new Date(f.fixture.date).toLocaleDateString()}</span>
+                            <li key={i} className="text-sm bg-white p-2 rounded border border-gray-100 flex justify-between items-center">
+                                <div>
+                                    <span className="text-gray-600 font-semibold">{f.teams.home.name} vs {f.teams.away.name}</span>
+                                    {f.leagueName && <span className="block text-[10px] text-gray-400">{f.leagueName}</span>}
+                                </div>
+                                <span className="text-xs text-gray-400 self-center whitespace-nowrap ml-2">
+                                    {new Date(f.fixture.date).toLocaleDateString([], {day: '2-digit', month: 'short', hour:'2-digit', minute:'2-digit'})}
+                                </span>
                             </li>
                         ))}
                     </ul>

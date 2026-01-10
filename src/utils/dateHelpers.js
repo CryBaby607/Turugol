@@ -25,7 +25,7 @@ export const parseFirebaseDate = (timestamp) => {
  */
 export const isExpired = (deadline) => {
     const date = parseFirebaseDate(deadline);
-    if (!date) return false; // Si no hay fecha límite, asumimos que no expira (o ajusta según tu regla)
+    if (!date) return false; 
     return new Date() > date;
 };
 
@@ -60,4 +60,21 @@ export const getTimeRemaining = (timestamp) => {
     if (days > 0) return `${days} días restantes`;
     if (hours > 0) return `${hours} horas restantes`;
     return "¡Cierra pronto!";
+};
+
+/**
+ * Calcula la temporada de fútbol actual basándose en el mes.
+ * Si estamos en la primera mitad del año (Ene-Jun), la temporada es la del año anterior.
+ * Ej: Enero 2026 -> Temporada 2025 (2025-2026)
+ */
+export const getCurrentFootballSeason = () => {
+    const now = new Date();
+    const month = now.getMonth(); // 0 = Enero, 11 = Diciembre
+    const year = now.getFullYear();
+
+    if (month < 6) { 
+        return year - 1;
+    }
+    
+    return year;
 };
