@@ -1,29 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { quinielaService } from '../../services/quinielaService';
-import { isExpired, formatDisplayDate } from '../../utils/dateHelpers'; // [!code ++]
+import { formatDisplayDate } from '../../utils/dateHelpers';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
+import { db } from '../../firebase/config';
+import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 
 const ManageQuinielas = () => {
     const navigate = useNavigate();
     const [quinielas, setQuinielas] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Configuración de Paginación y Filtros
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 9;
     const [filter, setFilter] = useState('active');
 
     useEffect(() => {
         fetchQuinielas();
-    }, []);
+    }, [filter]);
 
     const fetchQuinielas = async () => {
         setLoading(true);
         try {
-            const data = await quinielaService.getAll();
+            const now = Timestamp.now();
+            const collectionRef = collection(db, 'quinielas');
+            let q;
+
+            if (filter === 'active') {
+                q = query(
+                    collectionRef,
+                    where('metadata.deadline', '>', now),
+                    orderBy('metadata.deadline', 'asc'),
+                    limit(50)
+                );
+            } else {
+                q = query(
+                    collectionRef,
+                    where('metadata.deadline', '<=', now),
+                    orderBy('metadata.deadline', 'desc'),
+                    limit(50)
+                );
+            }
+
+            const snapshot = await getDocs(q);
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setQuinielas(data);
+            setCurrentPage(1); 
         } catch (error) {
             console.error("Error:", error);
             toast.error("Error al cargar quinielas");
@@ -58,30 +81,22 @@ const ManageQuinielas = () => {
         }
     };
 
-    // [!code success] Lógica de filtrado unificada con utils
-    const filteredQuinielas = quinielas.filter(q => {
-        const expired = isExpired(q.metadata.deadline);
-        return filter === 'active' ? !expired : expired;
-    });
-
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredQuinielas.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(filteredQuinielas.length / itemsPerPage);
+    const currentItems = quinielas.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(quinielas.length / itemsPerPage);
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            {/* Encabezado limpio sin botones */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Administrar Quinielas</h1>
             </div>
 
-            {/* Pestañas de Filtro */}
             <div className="flex gap-4 mb-6 border-b border-gray-200">
-                <button onClick={() => { setFilter('active'); setCurrentPage(1); }} className={`pb-2 px-4 font-medium transition-colors ${filter === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                <button onClick={() => setFilter('active')} className={`pb-2 px-4 font-medium transition-colors ${filter === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
                     En Juego
                 </button>
-                <button onClick={() => { setFilter('history'); setCurrentPage(1); }} className={`pb-2 px-4 font-medium transition-colors ${filter === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                <button onClick={() => setFilter('history')} className={`pb-2 px-4 font-medium transition-colors ${filter === 'history' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}>
                     Historial
                 </button>
             </div>
@@ -90,7 +105,7 @@ const ManageQuinielas = () => {
                 <div className="flex justify-center items-center py-20 text-gray-400">
                     <i className="fas fa-circle-notch fa-spin mr-2"></i> Cargando...
                 </div>
-            ) : filteredQuinielas.length === 0 ? (
+            ) : quinielas.length === 0 ? (
                 <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
                     <i className="fas fa-clipboard-list text-4xl text-gray-300 mb-3"></i>
                     <p className="text-gray-500 font-medium">No hay quinielas en esta sección.</p>
@@ -148,7 +163,6 @@ const ManageQuinielas = () => {
                         ))}
                     </div>
 
-                    {/* Paginación */}
                     {totalPages > 1 && (
                         <div className="flex justify-center items-center gap-4 pb-8">
                             <button 

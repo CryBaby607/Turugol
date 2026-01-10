@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth'; 
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 
@@ -10,12 +10,11 @@ const UserHistory = () => {
     const [participaciones, setParticipaciones] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Estados para Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 6; 
 
     const [selectedParticipation, setSelectedParticipation] = useState(null);
-    const [selectedPayment, setSelectedPayment] = useState(null); // Nuevo estado para modal de pago
+    const [selectedPayment, setSelectedPayment] = useState(null); 
     const [selectedQuinielaDetails, setSelectedQuinielaDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -36,7 +35,8 @@ const UserHistory = () => {
             const q = query(
                 collection(db, 'userEntries'),
                 where('userId', '==', user.uid),
-                orderBy('createdAt', 'desc')
+                orderBy('createdAt', 'desc'),
+                limit(50)
             );
             
             const querySnapshot = await getDocs(q);
@@ -49,7 +49,8 @@ const UserHistory = () => {
                 try {
                     const qFallback = query(
                         collection(db, 'userEntries'), 
-                        where('userId', '==', user.uid)
+                        where('userId', '==', user.uid),
+                        limit(50)
                     );
                     const snapFallback = await getDocs(qFallback);
                     const dataFallback = snapFallback.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -198,7 +199,6 @@ const UserHistory = () => {
                                     </div>
 
                                     <div className="flex gap-2">
-                                        {/* Botón de Pago Separado - Wallet Icon */}
                                         {part.paymentStatus !== 'paid' && (
                                             <button
                                                 onClick={(e) => handleViewPayment(e, part)}
@@ -261,7 +261,6 @@ const UserHistory = () => {
                 </>
             )}
 
-            {/* Modal de Pago Separado */}
             {selectedPayment && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl relative animate-in zoom-in duration-200">
@@ -285,7 +284,6 @@ const UserHistory = () => {
                 </div>
             )}
 
-            {/* Modal de Detalles (Sin Banner de Pago) */}
             {selectedParticipation && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-3xl max-w-4xl w-full p-4 md:p-8 shadow-2xl my-auto">

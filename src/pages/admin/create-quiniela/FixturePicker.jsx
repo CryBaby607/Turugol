@@ -1,146 +1,121 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchFromApi } from '../../../services/footballApi'; 
+import { toast } from 'sonner';
 
-const FixturePicker = ({ 
-    isLoading, 
-    filteredFixtures, 
-    selectedFixtures, 
-    toggleFixtureSelection, 
-    selectedRound, 
-    handleRoundChange, 
-    isLoadingRounds, 
-    availableRounds, 
-    searchTerm, 
-    setSearchTerm 
-}) => {
+const FixturePicker = ({ selectedLeagues, selectedFixtures, updateData, onNext, onPrev }) => {
+    const [loading, setLoading] = useState(false);
+    const [availableFixtures, setAvailableFixtures] = useState([]);
+
+    useEffect(() => {
+        loadFixtures();
+    }, [selectedLeagues]);
+
+    const loadFixtures = async () => {
+        setLoading(true);
+        try {
+            // NOTA: Asegúrate de tener una función que soporte múltiples ligas o iterar
+            // Aquí un ejemplo simple iterando las ligas seleccionadas
+            let allFixtures = [];
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            const toDate = nextWeek.toISOString().split('T')[0];
+
+            // Ejemplo de llamada real (ajusta según tu servicio):
+            for (const leagueId of selectedLeagues) {
+                 const data = await fetchFromApi('fixtures', `?league=${leagueId}&season=2024&from=${today}&to=${toDate}&timezone=America/Mexico_City`);
+                 if (data.response) {
+                     allFixtures = [...allFixtures, ...data.response];
+                 }
+            }
+            
+            setAvailableFixtures(allFixtures);
+        } catch (error) {
+            console.error("Error cargando partidos", error);
+            toast.error("No se pudieron cargar los partidos de la API");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleFixture = (fixture) => {
+        const current = selectedFixtures || [];
+        const exists = current.find(f => f.fixture.id === fixture.fixture.id);
+        
+        if (exists) {
+            updateData({ fixtures: current.filter(f => f.fixture.id !== fixture.fixture.id) });
+        } else {
+            updateData({ fixtures: [...current, fixture] });
+        }
+    };
+
     return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center shrink-0">
-                    <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">3</span>
-                    Partidos Disponibles
-                </h3>
-                
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                        <input 
-                            type="text" 
-                            placeholder="Buscar equipo..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                        />
-                    </div>
-
-                    <select 
-                        value={selectedRound} 
-                        onChange={handleRoundChange}
-                        disabled={isLoadingRounds}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:opacity-50"
-                    >
-                        {isLoadingRounds ? (
-                            <option>Cargando jornadas...</option>
-                        ) : (
-                            availableRounds.map(round => (
-                                <option key={round} value={round}>
-                                    {round.replace('Regular Season - ', 'Jornada ')}
-                                </option>
-                            ))
-                        )}
-                    </select>
-                </div>
+        <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">Seleccionar Partidos</h2>
+                <span className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold">
+                    {selectedFixtures.length} seleccionados
+                </span>
             </div>
 
-            {isLoading ? (
-                <div className="py-20 text-center">
-                    <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p className="text-gray-500 font-medium italic">Consultando calendario con la API...</p>
+            {loading ? (
+                <div className="py-20 text-center text-gray-400">
+                    <i className="fas fa-circle-notch fa-spin text-2xl"></i> Cargando partidos...
+                </div>
+            ) : availableFixtures.length === 0 ? (
+                <div className="py-20 text-center text-gray-400 bg-gray-50 rounded-xl border border-dashed">
+                    No se encontraron partidos próximos en estas ligas.
                 </div>
             ) : (
-                <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {filteredFixtures.length > 0 ? (
-                            filteredFixtures.map(item => {
-                                const isSelected = selectedFixtures.some(
-                                    f => f.fixture.id === item.fixture.id
-                                );
-
-                                const matchDate = new Date(item.fixture.date);
-                                const dateString = matchDate.toLocaleDateString([], { 
-                                    day: '2-digit', 
-                                    month: 'short',
-                                    year: 'numeric'
-                                });
-                                const timeString = matchDate.toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                });
-
-                                return (
-                                    <div 
-                                        key={item.fixture.id} 
-                                        onClick={() => toggleFixtureSelection(item)}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 group relative ${
-                                            isSelected 
-                                                ? 'border-blue-500 bg-blue-50 shadow-md ring-1 ring-blue-200' 
-                                                : 'border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-4">
-                                            <div className="flex flex-col items-center flex-1 text-center">
-                                                <img
-                                                    src={item.teams.home.logo}
-                                                    alt=""
-                                                    className="h-10 w-10 object-contain mb-2 group-hover:scale-110 transition-transform"
-                                                />
-                                                <span className="text-[10px] font-bold text-gray-700 uppercase leading-tight line-clamp-2">
-                                                    {item.teams.home.name}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex flex-col items-center shrink-0 min-w-[85px]">
-                                                <span className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-tighter">
-                                                    {dateString}
-                                                </span>
-                                                <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full mb-1 italic">
-                                                    VS
-                                                </span>
-                                                <span className="text-[10px] text-slate-500 font-bold tracking-tight">
-                                                    {timeString}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex flex-col items-center flex-1 text-center">
-                                                <img
-                                                    src={item.teams.away.logo}
-                                                    alt=""
-                                                    className="h-10 w-10 object-contain mb-2 group-hover:scale-110 transition-transform"
-                                                />
-                                                <span className="text-[10px] font-bold text-gray-700 uppercase leading-tight line-clamp-2">
-                                                    {item.teams.away.name}
-                                                </span>
-                                            </div>
+                <div className="grid grid-cols-1 gap-3 max-h-[500px] overflow-y-auto pr-2">
+                    {availableFixtures.map((match) => {
+                        const isSelected = selectedFixtures.some(f => f.fixture.id === match.fixture.id);
+                        return (
+                            <div 
+                                key={match.fixture.id}
+                                onClick={() => toggleFixture(match)}
+                                className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all ${
+                                    isSelected ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-100 hover:bg-gray-50'
+                                }`}
+                            >
+                                <div className="flex items-center gap-4 flex-1">
+                                    <div className="text-right flex-1 font-semibold text-sm">{match.teams.home.name}</div>
+                                    <div className="flex flex-col items-center px-2">
+                                        <div className="flex gap-2">
+                                            <img src={match.teams.home.logo} className="w-6 h-6 object-contain" alt="" />
+                                            <span className="font-bold text-gray-400">VS</span>
+                                            <img src={match.teams.away.logo} className="w-6 h-6 object-contain" alt="" />
                                         </div>
-
-                                        {isSelected && (
-                                            <div className="absolute top-2 right-2 text-blue-600 animate-in zoom-in">
-                                                <i className="fas fa-check-circle text-sm"></i>
-                                            </div>
-                                        )}
+                                        <span className="text-[10px] text-gray-400 mt-1">
+                                            {new Date(match.fixture.date).toLocaleDateString()}
+                                        </span>
                                     </div>
-                                );
-                            })
-                        ) : (
-                            <div className="col-span-full py-12 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                                <i className="fas fa-calendar-times text-gray-300 text-3xl mb-3"></i>
-                                <p className="text-gray-400 text-sm font-medium">
-                                    No se encontraron partidos próximos para esta jornada.
-                                </p>
+                                    <div className="text-left flex-1 font-semibold text-sm">{match.teams.away.name}</div>
+                                </div>
+                                <div className="ml-4">
+                                    {isSelected ? (
+                                        <i className="fas fa-check-circle text-emerald-500 text-xl"></i>
+                                    ) : (
+                                        <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        );
+                    })}
                 </div>
             )}
+
+            <div className="flex justify-between mt-6 pt-4 border-t">
+                <button onClick={onPrev} className="px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">
+                    Atrás
+                </button>
+                <button 
+                    onClick={onNext}
+                    className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-emerald-700"
+                >
+                    Siguiente: Resumen
+                </button>
+            </div>
         </div>
     );
 };

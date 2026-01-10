@@ -16,7 +16,6 @@ const Leaderboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Estados para Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
@@ -44,41 +43,55 @@ const Leaderboard = () => {
     }, [quinielaId]);
 
     useEffect(() => {
-        if (!quinielaId) return;
+        let unsubscribe = null;
 
-        const entriesRef = collection(db, 'userEntries');
-        const q = query(
-            entriesRef,
-            where('quinielaId', '==', quinielaId),
-            orderBy('puntos', 'desc')
-        );
+        const setupListener = async () => {
+            if (!quinielaId) return;
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const rawData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            if (unsubscribe) {
+                unsubscribe();
+            }
 
-            let currentRank = 1;
-            const processedData = rawData.map((entry, index) => {
-                if (index > 0) {
-                    const prevEntry = rawData[index - 1];
-                    if (entry.puntos < prevEntry.puntos) {
-                        currentRank = index + 1;
+            const entriesRef = collection(db, 'userEntries');
+            const q = query(
+                entriesRef,
+                where('quinielaId', '==', quinielaId),
+                orderBy('puntos', 'desc')
+            );
+
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                const rawData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                let currentRank = 1;
+                const processedData = rawData.map((entry, index) => {
+                    if (index > 0) {
+                        const prevEntry = rawData[index - 1];
+                        if (entry.puntos < prevEntry.puntos) {
+                            currentRank = index + 1;
+                        }
                     }
-                }
-                return { ...entry, rank: currentRank };
+                    return { ...entry, rank: currentRank };
+                });
+
+                setLeaderboard(processedData);
+                setLoading(false);
+            }, (err) => {
+                console.error("Error Leaderboard:", err);
+                setError("Error al conectar con la base de datos.");
+                setLoading(false);
             });
+        };
 
-            setLeaderboard(processedData);
-            setLoading(false);
-        }, (err) => {
-            console.error("Error Leaderboard:", err);
-            setError("Error al conectar con la base de datos.");
-            setLoading(false);
-        });
+        setupListener();
 
-        return () => unsubscribe(); 
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
     }, [quinielaId]);
 
     const getRankIcon = (rank) => {
@@ -88,7 +101,6 @@ const Leaderboard = () => {
         return <span className="font-bold text-gray-500 text-lg">#{rank}</span>;
     };
 
-    // Lógica de Paginación
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = leaderboard.slice(indexOfFirstItem, indexOfLastItem);
@@ -211,7 +223,6 @@ const Leaderboard = () => {
                             </table>
                         </div>
 
-                        {/* Controles de Paginación */}
                         {totalPages > 1 && (
                             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                                 <span className="text-xs text-gray-500">Mostrando {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, leaderboard.length)} de {leaderboard.length}</span>

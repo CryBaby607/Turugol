@@ -1,45 +1,39 @@
 import { toast } from 'sonner';
 
-/**
- * Diccionario de errores comunes de Firebase/App
- */
-const ERROR_MESSAGES = {
-    'permission-denied': 'No tienes permisos para realizar esta acción.',
-    'unavailable': 'Servicio temporalmente no disponible. Revisa tu conexión.',
-    'auth/user-not-found': 'No se encontró cuenta con este correo.',
-    'auth/wrong-password': 'La contraseña es incorrecta.',
-    'auth/email-already-in-use': 'Este correo ya está registrado.',
-    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
-    'storage/unknown': 'Ocurrió un error al subir el archivo.',
-    'deadline-exceeded': 'La solicitud tardó demasiado. Intenta de nuevo.'
-};
-
-/**
- * Manejador centralizado de errores.
- * @param {Error|string} error - El objeto de error original.
- * @param {string} [customMessage] - (Opcional) Mensaje contexto para el usuario.
- */
-export const handleError = (error, customMessage = null) => {
-    // 1. Log para el desarrollador (siempre visible en consola)
-    console.error("❌ [System Error]:", error);
-
-    // 2. Determinar el mensaje para el usuario
-    let userMessage = customMessage || 'Ocurrió un error inesperado.';
-
-    // Si es un error de Firebase conocido, usamos su traducción
-    if (error?.code && ERROR_MESSAGES[error.code]) {
-        userMessage = ERROR_MESSAGES[error.code];
-    } 
-    // Si no hay mensaje custom y el error tiene mensaje legible (cuidado con esto en prod)
-    else if (!customMessage && error?.message) {
-        // Opcional: Solo mostrar mensaje técnico en desarrollo
-        // userMessage = error.message; 
+export const handleError = (error, contextTitle = 'Error en la operación') => {
+    if (import.meta.env.MODE !== 'production' || import.meta.env.VITE_ENABLE_LOGS === 'true') {
+        console.error(`[${contextTitle}]`, error);
     }
 
-    // 3. Mostrar Toast UI
-    toast.error(userMessage);
+    let userMessage = contextTitle;
+    let description = error?.message || 'Ocurrió un error inesperado.';
 
-    // 4. (Futuro) Aquí podrías agregar:
-    // logToSentry(error);
-    // logToAnalytics(error);
+    if (error?.code) {
+        switch (error.code) {
+            case 'permission-denied':
+                description = 'No tienes permisos para realizar esta acción.';
+                break;
+            case 'unavailable':
+                description = 'Sin conexión con el servidor. Revisa tu internet.';
+                break;
+            case 'already-exists':
+                description = 'El registro ya existe.';
+                break;
+            case 'not-found':
+                description = 'El documento solicitado no existe.';
+                break;
+            case 'failed-precondition':
+                description = 'Error de validación o índice faltante en la base de datos.';
+                break;
+            default:
+                description = `Error del sistema (${error.code})`;
+        }
+    }
+
+    toast.error(userMessage, {
+        description: description,
+        duration: 5000,
+    });
+    
+    return { error, userMessage, description };
 };

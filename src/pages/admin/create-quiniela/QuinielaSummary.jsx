@@ -1,74 +1,62 @@
 import React from 'react';
 
-const QuinielaSummary = ({ selectedFixtures, toggleFixtureSelection, isReadyToSubmit, isSubmitting, MAX_FIXTURES }) => {
+const QuinielaSummary = ({ data, onSubmit, onPrev, loading }) => {
     return (
-        <div className="sticky top-6 bg-slate-900 text-white p-6 rounded-2xl shadow-2xl ring-1 ring-white/10">
+        <div className="p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6 text-center">Resumen de la Quiniela</h2>
             
-            <div className="flex justify-between items-center border-b border-slate-700 pb-4 mb-4">
-                <h3 className="text-lg font-bold text-blue-400">Resumen</h3>
-                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold border ${selectedFixtures.length === MAX_FIXTURES ? 'bg-green-500 border-green-500 text-white' : 'bg-slate-800 border-slate-600 text-gray-300'}`}>
-                    <span>{selectedFixtures.length} / {MAX_FIXTURES}</span>
+            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-6 max-w-2xl mx-auto">
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <span className="block text-xs text-gray-500 uppercase font-bold">Título</span>
+                        <span className="font-bold text-gray-800 text-lg">{data.title}</span>
+                    </div>
+                    <div>
+                        <span className="block text-xs text-gray-500 uppercase font-bold">Deadline</span>
+                        <span className="font-bold text-gray-800">
+                            {data.deadline ? new Date(data.deadline).toLocaleString() : '-'}
+                        </span>
+                    </div>
+                    <div>
+                        <span className="block text-xs text-gray-500 uppercase font-bold">Entrada</span>
+                        <span className="font-bold text-emerald-600">${data.entryFee}</span>
+                    </div>
+                    <div>
+                        <span className="block text-xs text-gray-500 uppercase font-bold">Pozo Inicial</span>
+                        <span className="font-bold text-emerald-600">${data.pot}</span>
+                    </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4">
+                    <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase">Partidos Seleccionados ({data.fixtures.length})</h3>
+                    <ul className="space-y-2 max-h-48 overflow-y-auto">
+                        {data.fixtures.map((f, i) => (
+                            <li key={i} className="text-sm bg-white p-2 rounded border border-gray-100 flex justify-between">
+                                <span className="text-gray-600">{f.teams.home.name} vs {f.teams.away.name}</span>
+                                <span className="text-xs text-gray-400 self-center">{new Date(f.fixture.date).toLocaleDateString()}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
-            
-            <div className="space-y-3 max-h-[calc(100vh-350px)] overflow-y-auto pr-2 custom-scrollbar-dark mb-6">
-                {selectedFixtures.length === 0 ? (
-                    <div className="text-center py-10 text-slate-600">
-                        <i className="fas fa-clipboard-list text-4xl mb-3 opacity-50"></i>
-                        <p className="text-sm">Selecciona partidos para armar tu quiniela.</p>
-                    </div>
-                ) : (
-                    [...selectedFixtures].sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date)).map((f) => (
-                        <div key={f.fixture.id} className="group relative bg-slate-800/50 hover:bg-slate-800 p-3 rounded-lg border border-slate-700 transition-colors">
-                            
-                            <button 
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); toggleFixtureSelection(f); }}
-                                className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110 z-10"
-                            >
-                                <i className="fas fa-times text-xs"></i>
-                            </button>
 
-                            <div className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2 w-5/12 overflow-hidden">
-                                    <img src={f.teams.home.logo} className="w-5 h-5 object-contain" alt="" />
-                                    <span className="truncate font-medium text-slate-200">{f.teams.home.nameShort || f.teams.home.name.substring(0, 10)}</span>
-                                </div>
-                                <span className="text-slate-600 text-xs font-bold">VS</span>
-                                <div className="flex items-center justify-end gap-2 w-5/12 overflow-hidden">
-                                    <span className="truncate font-medium text-slate-200 text-right">{f.teams.away.nameShort || f.teams.away.name.substring(0, 10)}</span>
-                                    <img src={f.teams.away.logo} className="w-5 h-5 object-contain" alt="" />
-                                </div>
-                            </div>
-                            <div className="mt-2 text-[10px] text-center text-slate-500 font-mono">
-                                {new Date(f.fixture.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                            </div>
-                        </div>
-                    ))
-                )}
+            <div className="flex justify-between max-w-2xl mx-auto">
+                <button 
+                    onClick={onPrev} 
+                    disabled={loading}
+                    className="px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                >
+                    Atrás
+                </button>
+                <button 
+                    onClick={onSubmit}
+                    disabled={loading}
+                    className="bg-emerald-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 disabled:opacity-70"
+                >
+                    {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
+                    Confirmar y Crear
+                </button>
             </div>
-
-            <button 
-                type="submit" 
-                disabled={!isReadyToSubmit || isSubmitting} 
-                className="w-full py-4 px-6 rounded-xl font-bold text-sm tracking-wide text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 focus:ring-4 focus:ring-blue-500/30 shadow-lg disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed transition-all transform active:scale-95"
-            >
-                {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                        <i className="fas fa-spinner fa-spin"></i> CREANDO...
-                    </span>
-                ) : (
-                    <span className="flex items-center justify-center gap-2">
-                        CONFIRMAR QUINIELA <i className="fas fa-arrow-right"></i>
-                    </span>
-                )}
-            </button>
-            
-            {!isReadyToSubmit && selectedFixtures.length > 0 && (
-                <p className="text-center text-xs text-slate-500 mt-3">
-                    Completa todos los campos y selecciona {MAX_FIXTURES} partidos.
-                </p>
-            )}
         </div>
     );
 };

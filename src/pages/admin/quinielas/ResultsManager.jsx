@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { db, auth } from '../../../firebase/config'; // [!code ++] Agregamos auth
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore'; // [!code ++] serverTimestamp
+import { db, auth } from '../../../firebase/config';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { fetchFromApi } from '../../../services/footballApi';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
@@ -28,7 +28,6 @@ const ResultsManager = () => {
                     const data = { id: docSnap.id, ...docSnap.data() };
                     setQuiniela(data);
 
-                    // [!code ++] Advertencia visual si alguien más está procesando
                     if (data.metadata?.isProcessing) {
                         toast.warning(`⚠️ Esta quiniela está siendo procesada por: ${data.metadata.processingBy || 'Otro Admin'}`);
                     }
@@ -136,16 +135,6 @@ const ResultsManager = () => {
     const saveResultsAndCalculate = async () => {
         if (!quiniela) return;
 
-        // [!code ++] 1. Check de seguridad: Consultar estado fresco antes de intentar nada
-        const freshDocSnap = await getDoc(doc(db, 'quinielas', quiniela.id));
-        if (freshDocSnap.exists() && freshDocSnap.data().metadata?.isProcessing) {
-            return Swal.fire({
-                icon: 'error',
-                title: 'Bloqueado',
-                text: `Otro administrador (${freshDocSnap.data().metadata.processingBy}) está calculando puntos en este momento. Intenta en unos segundos.`
-            });
-        }
-
         const result = await Swal.fire({
             title: '¿Confirmas el cálculo de puntos?',
             text: "Se tomarán los marcadores actuales (90 min) para calcular el ranking.",
@@ -164,16 +153,24 @@ const ResultsManager = () => {
         const quinielaRef = doc(db, 'quinielas', quiniela.id);
 
         try {
-            // [!code ++] 2. LOCK: Establecer bandera de procesamiento
-            await updateDoc(quinielaRef, {
-                'metadata.isProcessing': true,
-                'metadata.processingBy': auth.currentUser?.email || 'Admin',
-                'metadata.processingStartedAt': serverTimestamp()
+            await runTransaction(db, async (transaction) => {
+                const sfDoc = await transaction.get(quinielaRef);
+                if (!sfDoc.exists()) throw "La quiniela no existe";
+
+                const data = sfDoc.data();
+                if (data.metadata?.isProcessing) {
+                    throw new Error(`LOCKED_BY:${data.metadata.processingBy}`);
+                }
+
+                transaction.update(quinielaRef, {
+                    'metadata.isProcessing': true,
+                    'metadata.processingBy': auth.currentUser?.email || 'Admin',
+                    'metadata.processingStartedAt': serverTimestamp()
+                });
             });
 
             const officialOutcomes = {};
 
-            // 1. Guardar resultados oficiales en la Quiniela
             const updatedFixtures = quiniela.fixtures.map(fixture => {
                 const newScore = editingScores[fixture.id];
                 let updatedFixture = { ...fixture };
@@ -201,22 +198,19 @@ const ResultsManager = () => {
                 return updatedFixture;
             });
 
-            // Actualizamos fixtures pero MANTENEMOS el lock (no lo quitamos aquí)
             await updateDoc(quinielaRef, { fixtures: updatedFixtures });
 
-            // 2. Calcular puntos de los usuarios
             const q = query(collection(db, 'userEntries'), where('quinielaId', '==', quiniela.id));
             const participationsSnapshot = await getDocs(q);
 
             if (participationsSnapshot.empty) {
                 toast.info("Resultados guardados (Sin participantes).", { id: processingToast });
-                return; // Irá al finally para desbloquear
+                return;
             }
 
             const BATCH_SIZE = 400;
             let batch = writeBatch(db);
             let counter = 0;
-            let batchCount = 0;
 
             for (const participationDoc of participationsSnapshot.docs) {
                 const data = participationDoc.data();
@@ -248,7 +242,6 @@ const ResultsManager = () => {
                     await batch.commit();
                     batch = writeBatch(db);
                     counter = 0;
-                    batchCount++;
                 }
             }
 
@@ -259,9 +252,18 @@ const ResultsManager = () => {
 
         } catch (error) {
             console.error("Error cálculo:", error);
-            toast.error("Error al procesar resultados", { id: processingToast });
+            if (error.message && error.message.includes('LOCKED_BY')) {
+                const lockedBy = error.message.split(':')[1];
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Bloqueado',
+                    text: `Otro administrador (${lockedBy}) inició el proceso justo antes que tú.`
+                });
+                toast.dismiss(processingToast);
+            } else {
+                toast.error("Error al procesar resultados", { id: processingToast });
+            }
         } finally {
-            // [!code ++] 3. UNLOCK: Siempre liberar el recurso al terminar (éxito o error)
             try {
                 await updateDoc(quinielaRef, {
                     'metadata.isProcessing': false,
@@ -269,7 +271,7 @@ const ResultsManager = () => {
                     'metadata.processingBy': null
                 });
             } catch (unlockError) {
-                console.error("Error al desbloquear quiniela:", unlockError);
+                console.warn("Intento de desbloqueo finalizado:", unlockError);
             }
             
             setIsProcessing(false);
@@ -292,7 +294,6 @@ const ResultsManager = () => {
                     </Link>
                     <h2 className="text-2xl font-bold text-gray-800">Resultados & Cálculo</h2>
                     <p className="text-sm text-gray-500">{quiniela?.metadata?.title}</p>
-                    {/* [!code ++] Indicador visual si está bloqueado */}
                     {quiniela?.metadata?.isProcessing && (
                         <p className="text-xs text-orange-600 mt-1 font-bold bg-orange-50 inline-block px-2 py-1 rounded animate-pulse">
                             <i className="fas fa-cog fa-spin mr-1"></i>
