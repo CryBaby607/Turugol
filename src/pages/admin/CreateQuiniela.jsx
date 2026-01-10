@@ -18,7 +18,6 @@ const CreateQuiniela = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     
-    // --- ESTADOS API MULTI-LIGA ---
     const [activeLeagueId, setActiveLeagueId] = useState(null); 
     const [availableRounds, setAvailableRounds] = useState([]);
     const [selectedRound, setSelectedRound] = useState('');
@@ -31,8 +30,7 @@ const CreateQuiniela = () => {
         title: '',
         type: 'public', 
         entryFee: 0,
-        // pot: 0, // ELIMINADO
-        deadline: '', // Se calculará automáticamente
+        deadline: '', 
         description: '',
         maxParticipants: 100,
         fixtures: [], 
@@ -108,8 +106,6 @@ const CreateQuiniela = () => {
         }
     };
 
-    // --- MANEJO DE ESTADO ---
-
     const updateData = (newData) => {
         setQuinielaData(prev => ({ ...prev, ...newData }));
     };
@@ -163,11 +159,9 @@ const CreateQuiniela = () => {
         return true;
     };
 
-    // NUEVO: Manejador especial para calcular deadline antes de pasar al resumen
     const handleStep3Next = () => {
         if (!validateStep3()) return;
 
-        // Calcular la fecha más temprana (deadline automático)
         const sortedFixtures = [...quinielaData.fixtures].sort((a, b) => 
             new Date(a.fixture.date) - new Date(b.fixture.date)
         );
@@ -193,8 +187,8 @@ const CreateQuiniela = () => {
                     title: quinielaData.title,
                     type: quinielaData.type,
                     entryFee: Number(quinielaData.entryFee),
-                    pot: 0, // Se eliminó del UI, se guarda como 0 o se puede eliminar esta línea si la DB no lo requiere
-                    deadline: new Date(quinielaData.deadline), // Fecha calculada
+                    pot: 0, 
+                    deadline: new Date(quinielaData.deadline), 
                     description: quinielaData.description || '',
                     maxParticipants: Number(quinielaData.maxParticipants),
                     createdBy: auth.currentUser?.uid || 'admin',
@@ -270,7 +264,6 @@ const CreateQuiniela = () => {
         <div className="max-w-5xl mx-auto p-4 md:p-8">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">Crear Nueva Quiniela</h1>
-                {/* Stepper (opcional simplificado para no alargar código) */}
                 <div className="flex items-center gap-2 text-sm text-gray-500 overflow-x-auto">
                     <span className={`px-3 py-1 rounded-full whitespace-nowrap ${step >= 1 ? 'bg-emerald-100 text-emerald-700 font-bold' : 'bg-gray-100'}`}>1. Config</span>
                     <div className="w-4 h-0.5 bg-gray-200 shrink-0"></div>

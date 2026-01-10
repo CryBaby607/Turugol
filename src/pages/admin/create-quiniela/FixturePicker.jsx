@@ -6,7 +6,6 @@ const FixturePicker = ({
     selectedFixtures, 
     toggleFixtureSelection, 
     
-    // Props nuevos Multi-Liga
     activeLeagueId,
     selectedLeaguesIds,
     allLeaguesData,
@@ -22,7 +21,6 @@ const FixturePicker = ({
 
     return (
         <div className="bg-white flex flex-col h-full">
-            {/* 1. HEADER: Selector de Ligas Activas */}
             <div className="p-4 border-b border-gray-100 bg-gray-50">
                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">Ligas Seleccionadas:</p>
                 <div className="flex gap-2 overflow-x-auto pb-2">
@@ -48,7 +46,6 @@ const FixturePicker = ({
                 </div>
             </div>
 
-            {/* 2. CONTROLES: Buscador y Jornadas */}
             <div className="p-6 pb-0">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center shrink-0">
@@ -92,7 +89,6 @@ const FixturePicker = ({
                 </div>
             </div>
 
-            {/* 3. GRID DE PARTIDOS */}
             <div className="flex-1 p-6 pt-2 overflow-y-auto min-h-[400px]">
                 {isLoading ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400">
@@ -102,7 +98,6 @@ const FixturePicker = ({
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {filteredFixtures.map(item => {
-                            // Check global: ¿Este partido ya está en mi carrito?
                             const isSelected = selectedFixtures.some(f => f.fixture.id === item.fixture.id);
 
                             const matchDate = new Date(item.fixture.date);
@@ -149,7 +144,6 @@ const FixturePicker = ({
                 )}
             </div>
 
-            {/* 4. FOOTER: Resumen del Carrito */}
             <div className="bg-gray-800 text-white p-4 flex justify-between items-center text-sm">
                 <span>
                     <i className="fas fa-shopping-cart mr-2"></i>

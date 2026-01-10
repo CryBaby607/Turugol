@@ -3,11 +3,11 @@ import { Navigate, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'sonner';
-import { isExpired } from '../utils/dateHelpers'; // [!code ++]
+import { isExpired } from '../utils/dateHelpers';
 
 const QuinielaGuard = ({ children }) => {
     const { quinielaId } = useParams();
-    const [status, setStatus] = useState('loading'); // loading, valid, expired, not-found
+    const [status, setStatus] = useState('loading');
 
     useEffect(() => {
         const checkQuiniela = async () => {
@@ -27,8 +27,6 @@ const QuinielaGuard = ({ children }) => {
 
                 const data = qSnap.data();
                 
-                // [!code warning] ANTES: Lógica manual propensa a errores
-                // [!code success] AHORA: Uso de utilidad centralizada
                 if (isExpired(data.metadata?.deadline)) {
                     setStatus('expired');
                     return;

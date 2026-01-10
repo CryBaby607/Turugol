@@ -2,20 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { POPULAR_LEAGUES, ALL_LEAGUES } from '../../../constants/leagues';
 
 const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
-    // Estado local para las ligas que se muestran en la cuadrícula
-    // Iniciamos con las populares, pero permitiremos agregar más dinámicamente
     const [displayedLeagues, setDisplayedLeagues] = useState(POPULAR_LEAGUES);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // EFECTO: Sincronizar ligas visuales
-    // Si el usuario ya seleccionó ligas que NO están en "Popular" (ej: al editar o volver atrás),
-    // nos aseguramos de agregarlas a 'displayedLeagues' para que las vea marcadas.
     useEffect(() => {
         if (selectedLeagues && selectedLeagues.length > 0) {
             const missingLeagues = selectedLeagues
-                .map(id => ALL_LEAGUES.find(l => l.id === id)) // Buscamos la info completa
-                .filter(l => l && !displayedLeagues.find(dl => dl.id === l.id)); // Filtramos las que faltan
+                .map(id => ALL_LEAGUES.find(l => l.id === id))
+                .filter(l => l && !displayedLeagues.find(dl => dl.id === l.id));
             
             if (missingLeagues.length > 0) {
                 setDisplayedLeagues(prev => [...prev, ...missingLeagues]);
@@ -33,20 +28,15 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
     };
 
     const handleAddLeagueFromModal = (league) => {
-        // 1. Agregamos la liga a la vista principal si no estaba
         if (!displayedLeagues.find(l => l.id === league.id)) {
             setDisplayedLeagues([...displayedLeagues, league]);
         }
-        // 2. La seleccionamos automáticamente
         toggleLeague(league.id);
         
-        // 3. Cerramos modal y limpiamos
         setIsModalOpen(false);
         setSearchTerm('');
     };
 
-    // Filtrar ligas en el modal:
-    // Excluir las que ya se están mostrando en el grid principal para no duplicar
     const modalLeagues = ALL_LEAGUES.filter(l => 
         !displayedLeagues.some(dl => dl.id === l.id) &&
         l.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -57,7 +47,6 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
             <h2 className="text-xl font-bold text-gray-800 mb-2">Seleccionar Competiciones</h2>
             <p className="text-gray-500 mb-6 text-sm">Elige todas las ligas y copas que quieras incluir en tu quiniela.</p>
 
-            {/* --- GRID PRINCIPAL --- */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
                 {displayedLeagues.map((league) => {
                     const isSelected = selectedLeagues?.includes(league.id);
@@ -88,7 +77,6 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
                     );
                 })}
 
-                {/* BOTÓN AGREGAR (Abre Modal) */}
                 <button 
                     onClick={() => setIsModalOpen(true)}
                     className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all gap-2 h-full min-h-[140px]"
@@ -100,7 +88,6 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
                 </button>
             </div>
 
-            {/* --- NAVEGACIÓN --- */}
             <div className="flex justify-between mt-8 border-t pt-6">
                 <button onClick={onPrev} className="px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">
                     Atrás
@@ -114,11 +101,9 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
                 </button>
             </div>
 
-            {/* --- MODAL DE BÚSQUEDA --- */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[80vh]">
-                        {/* Header Modal */}
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-gray-800">Agregar Competición</h3>
                             <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors">
@@ -126,7 +111,6 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
                             </button>
                         </div>
                         
-                        {/* Buscador */}
                         <div className="p-4 border-b">
                             <div className="relative">
                                 <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -141,7 +125,6 @@ const LeagueSelector = ({ selectedLeagues, updateData, onNext, onPrev }) => {
                             </div>
                         </div>
 
-                        {/* Lista de Resultados */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                             {modalLeagues.length > 0 ? (
                                 <div className="space-y-1">

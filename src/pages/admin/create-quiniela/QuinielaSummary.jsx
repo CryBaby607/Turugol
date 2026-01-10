@@ -21,16 +21,15 @@ const QuinielaSummary = ({ data, onSubmit, onPrev, loading }) => {
                         <span className="block text-xs text-gray-500 uppercase font-bold">Entrada</span>
                         <span className="font-bold text-emerald-600">${data.entryFee}</span>
                     </div>
-                    {/* Se eliminó Pozo Inicial */}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase">Partidos Seleccionados ({data.fixtures.length})</h3>
-                    <ul className="space-y-2 max-h-48 overflow-y-auto">
-                        {data.fixtures.map((f, i) => (
-                            <li key={i} className="text-sm bg-white p-2 rounded border border-gray-100 flex justify-between items-center">
-                                <div>
-                                    <span className="text-gray-600 font-semibold">{f.teams.home.name} vs {f.teams.away.name}</span>
+                    <h3 className="text-sm font-bold text-gray-700 mb-3">Partidos Seleccionados ({data.fixtures.length}):</h3>
+                    <ul className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {data.fixtures.map((f, idx) => (
+                            <li key={idx} className="bg-white p-3 rounded-lg border border-gray-100 flex justify-between items-center shadow-sm">
+                                <div className="flex-1">
+                                    <span className="text-xs font-bold text-gray-700">{f.teams.home.name} vs {f.teams.away.name}</span>
                                     {f.leagueName && <span className="block text-[10px] text-gray-400">{f.leagueName}</span>}
                                 </div>
                                 <span className="text-xs text-gray-400 self-center whitespace-nowrap ml-2">

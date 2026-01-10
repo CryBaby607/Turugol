@@ -1,7 +1,6 @@
 import React from 'react';
 
 const QuinielaConfig = ({ data, updateData, onNext }) => {
-    // Protección contra undefined
     const safeData = data || {};
 
     const handleChange = (e) => {
