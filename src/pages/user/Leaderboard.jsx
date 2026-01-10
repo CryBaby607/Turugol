@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import useAuthStatusAndRole from '../../hooks/useAuthStatusAndRole';
+// [!code ++] CAMBIO: Importación nombrada (con llaves) para corregir el error de sintaxis
+import { useAuthStatusAndRole } from '../../hooks/useAuthStatusAndRole';
 
 const Leaderboard = () => {
     const params = useParams();
     const quinielaId = (params.quinielaId || params.id)?.trim(); 
     const navigate = useNavigate();
-    const { role, user: currentUser } = useAuthStatusAndRole();
-    const isAdmin = role === 'admin';
+    
+    // [!code ++] CAMBIO: Usamos las propiedades reales que devuelve el hook
+    const { isAdmin, userData } = useAuthStatusAndRole();
+    // Mapeamos userData a currentUser para mantener compatibilidad con el resto del código
+    const currentUser = userData; 
 
     const [leaderboard, setLeaderboard] = useState([]);
     const [quinielaInfo, setQuinielaInfo] = useState(null);
