@@ -55,7 +55,6 @@ function App() {
 
                         <Route path="/dashboard/user/history" element={<UserHistory />} />
                         <Route path="/dashboard/user/profile" element={<UserProfile />} />
-                        <Route path="/dashboard/user/leaderboard/:quinielaId" element={<Leaderboard />} />
 
                     </Route>
                 </Route>

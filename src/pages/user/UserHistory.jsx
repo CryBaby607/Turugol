@@ -44,7 +44,7 @@ const UserHistory = () => {
             
             setParticipaciones(data);
         } catch (error) {
-            console.error("Error cargando historial:", error);
+            console.error(error);
             if (error.code === 'failed-precondition') {
                 try {
                     const qFallback = query(
@@ -95,7 +95,7 @@ const UserHistory = () => {
                 setSelectedQuinielaDetails(quinielaSnap.data());
             }
         } catch (error) {
-            console.error("Error al cargar detalles:", error);
+            console.error(error);
         } finally {
             setLoadingDetails(false);
         }
@@ -209,12 +209,6 @@ const UserHistory = () => {
                                             </button>
                                         )}
 
-                                        <button
-                                            onClick={() => navigate(`/dashboard/user/leaderboard/${part.quinielaId}`)}
-                                            className="px-3 py-2 bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 rounded-xl text-sm font-bold shadow-sm"
-                                        >
-                                            <i className="fas fa-trophy"></i>
-                                        </button>
                                         <button
                                             onClick={() => handleViewDetails(part)}
                                             className="px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl shadow-lg shadow-gray-200 hover:bg-black"
