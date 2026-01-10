@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { quinielaService } from '../../services/quinielaService';
-import { isExpired } from '../../utils/dateHelpers'; // [!code ++]
-import { toast } from 'sonner';
+import { calculateQuinielaCost } from '../../services/pricingService';
+import { isExpired } from '../../utils/dateHelpers';
+import { handleError } from '../../utils/errorHandler'; // [!code ++] Importamos el handler
+import { toast } from 'sonner'; // Mantenemos toast para mensajes de éxito
 import PaymentBanner from '../admin/quinielas/PaymentBanner';
 import FixtureList from './FixtureList';
 import QuinielaSummary from './QuinielaSummary';
@@ -38,8 +40,6 @@ const PlayQuiniela = () => {
                 
                 if (data) {
                     setQuiniela(data);
-                    
-                    // [!code success] Validación centralizada
                     if (isExpired(data.metadata?.deadline)) {
                         setExpiredStatus(true);
                     }
@@ -59,8 +59,9 @@ const PlayQuiniela = () => {
                     if (!entrySnap.empty) setAlreadyPlayed(true);
                 }
             } catch (error) { 
-                console.error(error);
-                toast.error("Error al cargar la quiniela");
+                // [!code warning] ANTES: console.error(error); toast.error(...)
+                // [!code success] AHORA: Delegamos al handler
+                handleError(error, "Error al cargar la quiniela");
             } finally { 
                 setLoading(false); 
             }
@@ -79,26 +80,16 @@ const PlayQuiniela = () => {
         });
     };
 
-    const calculateStats = () => {
-        let doubles = 0, triples = 0;
-        Object.values(predictions).forEach(p => {
-            if (p.length === 2) doubles++;
-            if (p.length === 3) triples++;
-        });
+    const stats = useMemo(() => {
+        const currentBasePrice = quiniela?.metadata?.cost !== undefined ? Number(quiniela.metadata.cost) : 100;
+        return calculateQuinielaCost(predictions, currentBasePrice);
+    }, [predictions, quiniela]);
 
-        const combinations = (2 ** doubles) * (3 ** triples);
-        const basePrice = quiniela?.metadata?.cost !== undefined ? Number(quiniela.metadata.cost) : 100;
-        const totalCost = combinations * basePrice;
-
-        return { doubles, triples, totalCost, combinations, basePrice };
-    };
-
-    const { doubles, triples, totalCost, combinations, basePrice } = calculateStats();
+    const { doubles, triples, totalCost, combinations, basePrice } = stats;
 
     const handleSubmit = async () => {
         if (!user) return toast.error("Debes iniciar sesión para participar");
         
-        // [!code success] Doble check de seguridad usando la utilidad
         if (isExpired(quiniela?.metadata?.deadline)) {
             setExpiredStatus(true);
             return toast.error("¡Lo sentimos! El tiempo para participar ha terminado.");
@@ -130,8 +121,8 @@ const PlayQuiniela = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
         } catch (error) {
-            console.error(error);
-            toast.error("Error al guardar: " + error.message);
+            // [!code success] Uso del handler centralizado
+            handleError(error, "No se pudo guardar tu quiniela");
         } finally {
             setSubmitting(false);
         }
