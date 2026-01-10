@@ -14,7 +14,12 @@ const AvailableQuinielas = () => {
     const fetchQuinielas = async () => {
       try {
         const docs = await quinielaService.getActive();
-        setQuiniela(docs);
+        const sortedDocs = docs.sort((a, b) => {
+            const dateA = parseFirebaseDate(a.metadata.deadline);
+            const dateB = parseFirebaseDate(b.metadata.deadline);
+            return dateA - dateB;
+        });
+        setQuiniela(sortedDocs);
       } catch (error) {
         console.error("Error al cargar quinielas:", error);
       } finally {
