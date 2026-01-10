@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../firebase/config';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, Timestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
 import PaymentSettingsForm from './PaymentSettingsForm';
 
 const StatCard = ({ title, value, icon, color, subtext, loading }) => {
@@ -43,34 +44,28 @@ const AdminDashboardPage = () => {
 
                 const qQuinielas = query(
                     collection(db, 'quinielas'),
-                    orderBy('metadata.createdAt', 'desc'),
+                    where('metadata.deadline', '>', Timestamp.now()),
+                    orderBy('metadata.deadline', 'asc'),
                     limit(10)
                 );
+                
                 const quinielasSnap = await getDocs(qQuinielas);
                 const quinielasData = quinielasSnap.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
 
-                const now = new Date();
-
-                const active = quinielasData.filter(
-                    q => q.metadata?.deadline?.toDate() > now
-                );
-
-                const deadlines = active
-                    .map(q => q.metadata.deadline.toDate())
-                    .sort((a, b) => a - b);
-
-                const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
+                const nextDeadline = quinielasData.length > 0 
+                    ? quinielasData[0].metadata.deadline.toDate() 
+                    : null;
 
                 setStats({
                     totalUsers,
-                    activeQuinielas: active.length,
+                    activeQuinielas: quinielasData.length,
                     nextDeadline
                 });
 
-                setRecentQuinielas(quinielasData.slice(0, 7));
+                setRecentQuinielas(quinielasData);
             } catch (error) {
                 console.error("Error cargando dashboard:", error);
             } finally {
@@ -81,18 +76,14 @@ const AdminDashboardPage = () => {
         fetchDashboardData();
     }, []);
 
-    const handleShareWhatsApp = (quiniela) => {
-        const link = `${window.location.origin}/dashboard/user/play/${quiniela.id}`;
-        const message = `¡Hola! Te invito a participar en la quiniela "${quiniela.metadata?.title || 'TuruGol'}". ⚽🏆\n\nIngresa tus pronósticos aquí: ${link}`;
-        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
-    };
-
     const handleCopyLink = (id) => {
         const link = `${window.location.origin}/dashboard/user/play/${id}`;
         navigator.clipboard.writeText(link)
-            .then(() => alert('¡Enlace copiado al portapapeles!'))
-            .catch(err => console.error('Error al copiar:', err));
+            .then(() => toast.success('¡Enlace copiado al portapapeles!'))
+            .catch(err => {
+                console.error('Error al copiar:', err);
+                toast.error('No se pudo copiar el enlace');
+            });
     };
 
     return (
@@ -146,7 +137,7 @@ const AdminDashboardPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <h3 className="font-bold text-gray-800">Actividad Reciente</h3>
+                        <h3 className="font-bold text-gray-800">Próximos Cierres</h3>
                         <Link
                             to="/dashboard/admin/manage"
                             className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -161,7 +152,7 @@ const AdminDashboardPage = () => {
                                     <th className="px-6 py-3">Título</th>
                                     <th className="px-6 py-3">Estado</th>
                                     <th className="px-6 py-3">Fecha Cierre</th>
-                                    <th className="px-6 py-3 text-center">Compartir</th>
+                                    <th className="px-6 py-3 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -174,7 +165,7 @@ const AdminDashboardPage = () => {
                                 ) : recentQuinielas.length === 0 ? (
                                     <tr>
                                         <td colSpan="4" className="p-4 text-center text-gray-400">
-                                            No hay quinielas creadas.
+                                            No hay quinielas activas próximas.
                                         </td>
                                     </tr>
                                 ) : (
@@ -202,16 +193,9 @@ const AdminDashboardPage = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500">
-                                                    {deadline.toLocaleDateString()}
+                                                    {deadline.toLocaleDateString()} {deadline.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                 </td>
                                                 <td className="px-6 py-4 flex justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleShareWhatsApp(quiniela)}
-                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                        title="Compartir por WhatsApp"
-                                                    >
-                                                        <i className="fab fa-whatsapp text-lg"></i>
-                                                    </button>
                                                     <button
                                                         onClick={() => handleCopyLink(quiniela.id)}
                                                         className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
