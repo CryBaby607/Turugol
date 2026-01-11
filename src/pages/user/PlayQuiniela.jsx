@@ -69,13 +69,28 @@ const PlayQuiniela = () => {
 
     const handleSelect = (fixtureId, selection) => {
         if (alreadyPlayed || showPaymentBanner || expiredStatus) return;
-        setPredictions(prev => {
-            const currentPicks = prev[fixtureId] || [];
-            const newPicks = currentPicks.includes(selection)
-                ? currentPicks.filter(item => item !== selection)
-                : [...currentPicks, selection];
-            return { ...prev, [fixtureId]: newPicks };
-        });
+
+        const currentPicks = predictions[fixtureId] || [];
+        const newPicks = currentPicks.includes(selection)
+            ? currentPicks.filter(item => item !== selection)
+            : [...currentPicks, selection];
+
+        const nextPredictions = { ...predictions, [fixtureId]: newPicks };
+        const currentBasePrice = quiniela?.metadata?.cost !== undefined ? Number(quiniela.metadata.cost) : 100;
+        
+        const { doubles: nextDoubles, triples: nextTriples } = calculateQuinielaCost(nextPredictions, currentBasePrice);
+
+        if (nextDoubles > MAX_DOUBLES) {
+            toast.warning(`Límite de dobles excedido (Máx: ${MAX_DOUBLES})`);
+            return;
+        }
+
+        if (nextTriples > MAX_TRIPLES) {
+            toast.warning(`Límite de triples excedido (Máx: ${MAX_TRIPLES})`);
+            return;
+        }
+
+        setPredictions(nextPredictions);
     };
 
     const stats = useMemo(() => {
